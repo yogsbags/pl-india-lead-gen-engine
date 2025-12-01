@@ -1,4 +1,4 @@
-# n8n Workflows - PL Capital Lead Generation
+# n8n Workflows - Lead Generation
 
 **Purpose**: Automated workflows for lead scraping, enrichment, and outreach
 
