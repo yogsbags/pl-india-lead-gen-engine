@@ -1,0 +1,10 @@
+# Ignore all markdown except README.md
+**/*.md
+!**/README.md
+
+# Node and build artifacts
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+*.log
