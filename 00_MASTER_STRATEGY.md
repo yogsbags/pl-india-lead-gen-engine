@@ -1,4 +1,4 @@
-# PL Capital Lead Generation Master Strategy
+# Lead Generation Master Strategy
 
 **Created**: 2025-10-03
 **Owner**: PL Capital Marketing & Business Development
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This document outlines a comprehensive lead generation strategy for PL Capital targeting 4 distinct segments:
+This document outlines a comprehensive lead generation strategy targeting 4 distinct segments:
 1. **Partners** (IFAs, Wealth Managers, Distributors)
 2. **HNIs** (High Net Worth Individuals - ₹5-25 Cr)
 3. **UHNIs** (Ultra High Net Worth Individuals - ₹25+ Cr)
