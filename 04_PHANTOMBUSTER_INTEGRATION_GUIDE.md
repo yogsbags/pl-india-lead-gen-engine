@@ -100,7 +100,7 @@
 | Plan | Price | Execution Time | Best For |
 |------|-------|----------------|----------|
 | **Starter** | $69/month | 20 hours | Testing, small campaigns |
-| **Pro** | $149/month | 80 hours | PL Capital recommended |
+| **Pro** | $149/month | 80 hours | Recommended |
 | **Team** | $439/month | 300 hours | Enterprise scale |
 
 **For PL Capital (7,700 leads)**:
