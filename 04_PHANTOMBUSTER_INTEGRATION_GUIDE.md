@@ -1,4 +1,4 @@
-# PhantomBuster Integration Guide for PL Capital Lead Generation
+# PhantomBuster Integration Guide for Lead Generation
 
 **Purpose**: Comprehensive guide for integrating PhantomBuster into the lead generation workflow
 
