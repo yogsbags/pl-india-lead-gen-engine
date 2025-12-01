@@ -1,4 +1,4 @@
-# PL Capital Client Profile Analysis
+# Client Profile Analysis
 
 **Analysis Date:** 2025-10-17
 **Total Clients Analyzed:** 50,721
@@ -279,7 +279,7 @@ Cities with high average AUM but lower volume (untapped potential):
 
 ### Total Addressable Market (TAM)
 
-**Current PL Capital Base:**
+**Current Cient Base:**
 - 50,721 clients
 - ₹29,682 Cr AUM
 
@@ -456,7 +456,7 @@ Cities with high average AUM but lower volume (untapped potential):
 
 ---
 
-**Document Owner:** PL Capital - Marketing & Business Development
+**Document Owner:** Marketing & Business Development
 **Last Updated:** 2025-10-17
 **Next Review:** Quarterly (or upon significant data changes)
 
