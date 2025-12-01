@@ -1,4 +1,4 @@
-# PL Capital Lead Generation Project
+# Lead Generation Project
 
 **Project Owner**: Marketing & Business Development
 **Created**: 2025-10-03
