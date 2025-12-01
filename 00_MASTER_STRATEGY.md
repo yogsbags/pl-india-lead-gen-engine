@@ -1,7 +1,7 @@
 # Lead Generation Master Strategy
 
 **Created**: 2025-10-03
-**Owner**: PL Capital Marketing & Business Development
+**Owner**: Marketing & Business Development
 **Objective**: Generate qualified leads across 4 target segments with hyperpersonalized outreach
 
 ---
@@ -35,7 +35,7 @@ This document outlines a comprehensive lead generation strategy targeting 4 dist
 - Client retention challenges
 - Compliance and regulatory complexity
 
-#### Value Proposition from PL Capital
+#### Value Proposition from 
 - 80-year legacy brand association
 - India's first quant PMS strategies (MADP, AQUA)
 - High commission structure
@@ -95,7 +95,7 @@ Seniority: Owner, Partner, Founder, Director, Senior
 - Need for systematic investment approach
 - Time constraints for active portfolio management
 
-#### Value Proposition from PL Capital
+#### Value Proposition from 
 - Quantitative, data-driven strategies (76% returns in AQUA Year 1)
 - Minimum ₹50 lakh investment (accessible for HNIs)
 - Systematic, bias-free investing
@@ -155,7 +155,7 @@ Education: IIM, IIT, Top B-Schools, Foreign Universities
 - Data-driven decision making
 - Wealth preservation across generations
 
-#### Value Proposition from PL Capital
+#### Value Proposition from 
 - Quantitative edge (MADP 6F Framework, AQUA 6S Framework)
 - Track record: 23.21% avg returns (backtested since 2006) vs 11.67% benchmark
 - Direct access to Siddharth Vora (Fund Manager, Executive Director)
@@ -215,7 +215,7 @@ Connections: 500+ (indicates influence)
 - Tax inefficiency in investments
 - Information overload and decision paralysis
 
-#### Value Proposition from PL Capital
+#### Value Proposition from 
 - Entry-level PMS access (₹50 lakh minimum)
 - AQUA Flexicap strategy (76% debut year returns)
 - Educational content and market insights
@@ -433,20 +433,20 @@ Phase 5: CRM Integration
 
 **Week 1: LinkedIn Connection**
 - Personal connection request from BD manager
-- Message: "I noticed your work with [specific detail]. PL Capital's quant strategies might interest your HNI clients."
+- Message: "I noticed your work with [specific detail]. 's quant strategies might interest your HNI clients."
 
 **Week 1 (Day 2): Email 1 - Introduction**
-- Subject: "Partner with 80-Year Legacy: PL Capital's Quant PMS for Your HNI Clients"
+- Subject: "Partner with 80-Year Legacy: 's Quant PMS for Your HNI Clients"
 - Content: Brief intro, AQUA's 76% returns, partnership benefits
 - CTA: Schedule 15-min discovery call
 
 **Week 1 (Day 5): Email 2 - Social Proof**
-- Subject: "How [IFA Name] Increased AUM by 40% with PL Capital PMS"
+- Subject: "How [IFA Name] Increased AUM by 40% with  PMS"
 - Content: Case study, testimonial, commission structure
 - CTA: Download partnership brochure
 
 **Week 2 (Day 3): LinkedIn Message**
-- Share recent PL Capital blog post
+- Share recent  blog post
 - Personal note: "Thought this MADP strategy analysis might interest your clients"
 
 **Week 2 (Day 6): Email 3 - Value Proposition**
@@ -491,7 +491,7 @@ Phase 5: CRM Integration
 
 **Week 1: LinkedIn Connection**
 - Connection from Siddharth Vora or senior BD manager
-- Message: "I noticed your success at [Company]. As fellow [IIM/IIT] alumni, I'd like to share PL Capital's quantitative investment approach."
+- Message: "I noticed your success at [Company]. As fellow [IIM/IIT] alumni, I'd like to share 's quantitative investment approach."
 
 **Week 1 (Day 2): Email 1 - Thought Leadership**
 - Subject: "For [Name]: How Quant Investing Generated 37.5% Alpha in 2024"
@@ -500,7 +500,7 @@ Phase 5: CRM Integration
 
 **Week 1 (Day 5): LinkedIn Engagement**
 - Like/comment on their recent post
-- Share relevant PL Capital content
+- Share relevant  content
 - Build familiarity
 
 **Week 2 (Day 2): Email 2 - Education**
@@ -562,12 +562,12 @@ Phase 5: CRM Integration
 
 **Week 1: Warm Introduction**
 - Reach out to mutual connection for intro
-- Alternative: LinkedIn connection from Amisha Vora (CMD, PL Capital)
+- Alternative: LinkedIn connection from Amisha Vora (CMD, )
 - Message: "Your work at [Company] is impressive. I'd value a conversation about quantitative wealth management."
 
 **Week 1 (Day 3): Executive Package Email**
 - Sent to EA or direct
-- Subject: "For [Name]: Exclusive Invitation from PL Capital Chairman"
+- Subject: "For [Name]: Exclusive Invitation from  Chairman"
 - Content: Personal letter from Amisha Vora, exclusive UHNI program overview
 - CTA: Schedule meeting via EA
 
@@ -631,7 +631,7 @@ Phase 5: CRM Integration
 
 **Week 1: LinkedIn Connection**
 - Automated but personalized connection request
-- Message: "Hi [Name], noticed you work at [Company]. PL Capital's quant investing strategies might interest you."
+- Message: "Hi [Name], noticed you work at [Company]. 's quant investing strategies might interest you."
 
 **Week 1 (Day 1): Email 1 - Newsletter Signup**
 - Subject: "Are You Making These 5 Investing Mistakes?"
@@ -654,7 +654,7 @@ Phase 5: CRM Integration
 - CTA: Register now (100 seats only)
 
 **Week 3 (Day 3): LinkedIn Content Share**
-- Share PL Capital blog post
+- Share  blog post
 - Comment on their finance-related posts
 - Build engagement
 
@@ -1017,7 +1017,6 @@ Phase 5: CRM Integration
 **Last Updated**: 2025-10-03
 **Next Review**: 2025-11-03
 **Owner**: Marketing & BD Team
-**Approvers**: Siddharth Vora, Amisha Vora
 
 ---
 
