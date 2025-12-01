@@ -1,0 +1,14 @@
+# Local environment overrides
+.env
+.env.local
+
+# Generated data
+data/leads/
+data/executions.json
+
+# Node modules
+node_modules/
+package-lock.json
+
+# Logs
+*.log

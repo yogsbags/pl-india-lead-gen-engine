@@ -1,0 +1,311 @@
+{
+  "name": "Partners Lead Scraping & Enrichment",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Partner segment LinkedIn search queries\nconst queries = [\n  {\n    \"title\": \"Financial Advisor\",\n    \"location\": \"Mumbai, India\",\n    \"industry\": \"Financial Services\",\n    \"companySize\": \"1-50\"\n  },\n  {\n    \"title\": \"Wealth Manager\",\n    \"location\": \"Delhi NCR, India\",\n    \"industry\": \"Investment Management\",\n    \"companySize\": \"1-50\"\n  },\n  {\n    \"title\": \"IFA\",\n    \"location\": \"Bangalore, India\",\n    \"industry\": \"Financial Services\",\n    \"companySize\": \"1-50\"\n  },\n  {\n    \"title\": \"Investment Advisor\",\n    \"location\": \"Pune, India\",\n    \"industry\": \"Wealth Management\",\n    \"companySize\": \"1-50\"\n  },\n  {\n    \"title\": \"Mutual Fund Distributor\",\n    \"location\": \"Chennai, India\",\n    \"industry\": \"Financial Services\",\n    \"companySize\": \"1-50\"\n  }\n];\n\nreturn queries.map(q => ({ json: q }));"
+      },
+      "name": "Define Partner Queries",
+      "type": "n8n-nodes-base.code",
+      "position": [250, 300],
+      "id": "node-1"
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "url": "https://api.apify.com/v2/acts/code_crafter~leads-finder/runs",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"searchQueries\": [\n    {\n      \"title\": \"{{ $json.title }}\",\n      \"location\": \"{{ $json.location }}\",\n      \"industry\": \"{{ $json.industry }}\",\n      \"companySize\": \"{{ $json.companySize }}\"\n    }\n  ],\n  \"maxResults\": 100,\n  \"includeEmail\": true,\n  \"includePhone\": true\n}",
+        "options": {}
+      },
+      "name": "Apify - Scrape Partners",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [450, 300],
+      "id": "node-2",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "apify-api-key",
+          "name": "Apify API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 180,
+        "unit": "seconds"
+      },
+      "name": "Wait for Scraping",
+      "type": "n8n-nodes-base.wait",
+      "position": [650, 300],
+      "id": "node-3"
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "url": "=https://api.apify.com/v2/datasets/{{ $json.data.defaultDatasetId }}/items?format=json",
+        "method": "GET",
+        "options": {}
+      },
+      "name": "Get Scraped Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [850, 300],
+      "id": "node-4",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "apify-api-key",
+          "name": "Apify API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Lead scoring for Partners segment\nconst lead = $input.item.json;\n\nlet score = 0;\n\n// Company size scoring (0-25 points)\nif (lead.companySize && lead.companySize.includes('10-50')) score += 25;\nelse if (lead.companySize && lead.companySize.includes('1-10')) score += 15;\n\n// SEBI registration (0-25 points) - check if mentioned in profile\nif (lead.description && (lead.description.includes('SEBI') || lead.description.includes('RIA') || lead.description.includes('IFA'))) {\n  score += 25;\n}\n\n// Years in business (0-20 points)\nconst yearsMatch = lead.description?.match(/(\\d+)\\+?\\s*years?/i);\nif (yearsMatch) {\n  const years = parseInt(yearsMatch[1]);\n  if (years >= 10) score += 20;\n  else if (years >= 5) score += 15;\n  else if (years >= 3) score += 10;\n}\n\n// Has website (0-15 points)\nif (lead.website) score += 15;\n\n// LinkedIn activity (0-15 points)\nif (lead.activityLevel === 'high' || lead.posts > 10) score += 15;\nelse if (lead.activityLevel === 'medium' || lead.posts > 5) score += 10;\n\n// Return enriched lead with score\nreturn {\n  json: {\n    ...lead,\n    leadScore: score,\n    leadTier: score >= 80 ? 'Hot' : score >= 60 ? 'Warm' : 'Cold',\n    segment: 'Partners',\n    scrapedDate: new Date().toISOString()\n  }\n};"
+      },
+      "name": "Score Partners Leads",
+      "type": "n8n-nodes-base.code",
+      "position": [1050, 300],
+      "id": "node-5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.leadScore }}",
+              "operation": "largerEqual",
+              "value2": 60
+            }
+          ]
+        }
+      },
+      "name": "Filter Qualified Leads",
+      "type": "n8n-nodes-base.if",
+      "position": [1250, 300],
+      "id": "node-6"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Partners_Leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "name": "={{ $json.name }}",
+            "title": "={{ $json.title }}",
+            "company": "={{ $json.company }}",
+            "email": "={{ $json.email }}",
+            "phone": "={{ $json.phone }}",
+            "linkedinUrl": "={{ $json.linkedinUrl }}",
+            "website": "={{ $json.website }}",
+            "location": "={{ $json.location }}",
+            "leadScore": "={{ $json.leadScore }}",
+            "leadTier": "={{ $json.leadTier }}",
+            "scrapedDate": "={{ $json.scrapedDate }}"
+          }
+        },
+        "options": {}
+      },
+      "name": "Save to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [1450, 200],
+      "id": "node-7",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-oauth",
+          "name": "Google Sheets OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.leadScore }}",
+              "operation": "largerEqual",
+              "value2": 80
+            }
+          ]
+        }
+      },
+      "name": "Hot Leads Only",
+      "type": "n8n-nodes-base.if",
+      "position": [1450, 400],
+      "id": "node-8"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_SLACK_CHANNEL_ID"
+        },
+        "text": "=🔥 **Hot Partner Lead Detected!**\\n\\n*Name:* {{ $json.name }}\\n*Company:* {{ $json.company }}\\n*Title:* {{ $json.title }}\\n*Score:* {{ $json.leadScore }}/100\\n*Email:* {{ $json.email }}\\n*Phone:* {{ $json.phone }}\\n*LinkedIn:* {{ $json.linkedinUrl }}\\n\\n*Action:* Immediate outreach recommended!",
+        "otherOptions": {}
+      },
+      "name": "Notify Team (Hot Lead)",
+      "type": "n8n-nodes-base.slack",
+      "position": [1650, 500],
+      "id": "node-9",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "slack-oauth",
+          "name": "Slack OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nconst totalLeads = items.length;\nconst hotLeads = items.filter(item => item.json.leadScore >= 80).length;\nconst warmLeads = items.filter(item => item.json.leadScore >= 60 && item.json.leadScore < 80).length;\nconst coldLeads = items.filter(item => item.json.leadScore < 60).length;\n\nconst summary = {\n  totalScraped: totalLeads,\n  qualified: hotLeads + warmLeads,\n  hot: hotLeads,\n  warm: warmLeads,\n  cold: coldLeads,\n  scrapeDate: new Date().toISOString(),\n  segment: 'Partners'\n};\n\nreturn [{ json: summary }];"
+      },
+      "name": "Generate Summary",
+      "type": "n8n-nodes-base.code",
+      "position": [1650, 200],
+      "id": "node-10"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_SLACK_CHANNEL_ID"
+        },
+        "text": "=📊 **Partners Lead Scraping Complete**\\n\\n*Total Scraped:* {{ $json.totalScraped }}\\n*Qualified Leads:* {{ $json.qualified }}\\n  - 🔥 Hot (80+): {{ $json.hot }}\\n  - 🌡️ Warm (60-79): {{ $json.warm }}\\n  - 🧊 Cold (<60): {{ $json.cold }}\\n\\n*Date:* {{ $json.scrapeDate }}\\n\\nLeads saved to Google Sheets: Partners_Leads",
+        "otherOptions": {}
+      },
+      "name": "Send Summary to Slack",
+      "type": "n8n-nodes-base.slack",
+      "position": [1850, 200],
+      "id": "node-11",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "slack-oauth",
+          "name": "Slack OAuth"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Define Partner Queries": {
+      "main": [
+        [
+          {
+            "node": "Apify - Scrape Partners",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify - Scrape Partners": {
+      "main": [
+        [
+          {
+            "node": "Wait for Scraping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Scraping": {
+      "main": [
+        [
+          {
+            "node": "Get Scraped Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Scraped Data": {
+      "main": [
+        [
+          {
+            "node": "Score Partners Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Partners Leads": {
+      "main": [
+        [
+          {
+            "node": "Filter Qualified Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Qualified Leads": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Hot Leads Only",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Generate Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hot Leads Only": {
+      "main": [
+        [
+          {
+            "node": "Notify Team (Hot Lead)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Summary": {
+      "main": [
+        [
+          {
+            "node": "Send Summary to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

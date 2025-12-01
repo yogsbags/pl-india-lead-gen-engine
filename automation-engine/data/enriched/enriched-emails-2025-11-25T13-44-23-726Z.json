@@ -1,0 +1,26 @@
+[
+  {
+    "input_email": "subendu22@gmail.com",
+    "status": "error",
+    "error": "Apollo API Error (400): {\"error\":\"Please add a valid 'webhook_url' parameter when using 'reveal_phone_number'\"}",
+    "enriched_at": "2025-11-25T13:44:20.405Z"
+  },
+  {
+    "input_email": "vineetnair33@gmail.com",
+    "status": "error",
+    "error": "Apollo API Error (400): {\"error\":\"Please add a valid 'webhook_url' parameter when using 'reveal_phone_number'\"}",
+    "enriched_at": "2025-11-25T13:44:21.325Z"
+  },
+  {
+    "input_email": "haritgautam56@gmail.com",
+    "status": "error",
+    "error": "Apollo API Error (400): {\"error\":\"Please add a valid 'webhook_url' parameter when using 'reveal_phone_number'\"}",
+    "enriched_at": "2025-11-25T13:44:22.785Z"
+  },
+  {
+    "input_email": "parulgautam56@gmail.com",
+    "status": "error",
+    "error": "Apollo API Error (400): {\"error\":\"Please add a valid 'webhook_url' parameter when using 'reveal_phone_number'\"}",
+    "enriched_at": "2025-11-25T13:44:23.725Z"
+  }
+]

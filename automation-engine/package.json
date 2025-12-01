@@ -1,0 +1,54 @@
+{
+  "name": "plc-lead-automation",
+  "version": "0.1.0",
+  "description": "N8N-style lead generation workflow engine for PL Capital ICP segments",
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js run --all",
+    "init": "node main.js init",
+    "run": "node main.js run",
+    "run:partners": "node main.js run --segment partners",
+    "run:hni": "node main.js run --segment hni",
+    "run:uhni": "node main.js run --segment uhni",
+    "run:mass": "node main.js run --segment mass_affluent",
+    "run:signals-hni": "node main.js run --segment signals-hni",
+    "run:signals-uhni": "node main.js run --segment signals-uhni",
+    "run:signals-mass": "node main.js run --segment signals-mass-affluent",
+    "run:signals-partners": "node main.js run --segment signals-partners",
+    "status": "node main.js status",
+    "lint": "node ./scripts/run-lint.js",
+    "csv": "node utils/convert-to-csv.mjs",
+    "csv:partners": "node utils/convert-to-csv.mjs partners",
+    "csv:hni": "node utils/convert-to-csv.mjs hni",
+    "csv:uhni": "node utils/convert-to-csv.mjs uhni",
+    "csv:mass": "node utils/convert-to-csv.mjs mass_affluent",
+    "csv:minimal": "node utils/convert-to-csv.mjs --minimal",
+    "csv:email": "node utils/convert-to-csv.mjs --email-outreach"
+  },
+  "keywords": [
+    "lead-generation",
+    "workflow",
+    "n8n",
+    "automation",
+    "apify",
+    "google-sheets",
+    "plcapital"
+  ],
+  "author": "PL Capital Marketing Ops",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.12.2",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "fs-extra": "^11.2.0",
+    "nanoid": "^5.0.7",
+    "node-fetch": "^3.3.2",
+    "pino": "^9.3.2",
+    "pino-pretty": "^11.2.2"
+  }
+}

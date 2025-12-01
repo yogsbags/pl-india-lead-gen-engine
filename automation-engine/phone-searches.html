@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Number LinkedIn Searches</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #0073b1;
+            margin-bottom: 30px;
+        }
+        .phone-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .phone-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .search-links {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .search-btn {
+            padding: 10px 20px;
+            background: #0073b1;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            transition: background 0.3s;
+        }
+        .search-btn:hover {
+            background: #005885;
+        }
+        .linkedin-input {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: 2px solid #0073b1;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .open-all-btn {
+            padding: 15px 30px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .open-all-btn:hover {
+            background: #218838;
+        }
+        .copy-json-btn {
+            padding: 15px 30px;
+            background: #ff9800;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            margin-left: 10px;
+        }
+        .copy-json-btn:hover {
+            background: #f57c00;
+        }
+        .instructions {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📞 Phone Number LinkedIn Search</h1>
+
+    <div class="instructions">
+        <h3>Instructions:</h3>
+        <ol>
+            <li>Click <strong>"Open All LinkedIn Searches"</strong> to open all 9 searches in separate tabs</li>
+            <li>For each tab, look for LinkedIn profiles that match the phone number</li>
+            <li>Copy the LinkedIn profile URL (e.g., https://linkedin.com/in/john-doe-123456)</li>
+            <li>Paste it in the input field below the corresponding phone number</li>
+            <li>Once done, click <strong>"Copy JSON"</strong> to get the enrichment data</li>
+            <li>Create <code>linkedin-profiles.json</code> in the automation-engine folder</li>
+            <li>Run: <code>node test/enrich-from-linkedin-urls.mjs</code></li>
+        </ol>
+    </div>
+
+    <button class="open-all-btn" onclick="openAllSearches()">🔍 Open All LinkedIn Searches</button>
+    <button class="copy-json-btn" onclick="copyJSON()">📋 Copy JSON for Enrichment</button>
+
+    <div id="phone-list"></div>
+
+    <script>
+        const phoneNumbers = [
+            '9664140840',
+            '9892405520',
+            '9867676224',
+            '9987558069',
+            '9833355585',
+            '8879771257',
+            '9930998698',
+            '8884568885',
+            '9967952793'
+        ];
+
+        function createPhoneCard(phone) {
+            const linkedinSearchUrl = `https://www.google.com/search?q="${phone}" site:linkedin.com/in`;
+
+            return `
+                <div class="phone-card">
+                    <div class="phone-number">📱 ${phone}</div>
+                    <div class="search-links">
+                        <a href="${linkedinSearchUrl}" target="_blank" class="search-btn">
+                            🔍 Search LinkedIn
+                        </a>
+                    </div>
+                    <input
+                        type="text"
+                        class="linkedin-input"
+                        id="linkedin-${phone}"
+                        placeholder="Paste LinkedIn profile URL here (e.g., https://linkedin.com/in/john-doe)"
+                    />
+                </div>
+            `;
+        }
+
+        function openAllSearches() {
+            phoneNumbers.forEach(phone => {
+                const url = `https://www.google.com/search?q="${phone}" site:linkedin.com/in`;
+                window.open(url, '_blank');
+            });
+        }
+
+        function copyJSON() {
+            const enrichments = [];
+
+            phoneNumbers.forEach(phone => {
+                const input = document.getElementById(`linkedin-${phone}`);
+                const linkedinUrl = input.value.trim();
+
+                if (linkedinUrl) {
+                    enrichments.push({
+                        phone: phone,
+                        linkedin_url: linkedinUrl
+                    });
+                }
+            });
+
+            if (enrichments.length === 0) {
+                alert('⚠️ Please add at least one LinkedIn URL first!');
+                return;
+            }
+
+            const json = JSON.stringify({ enrichments }, null, 2);
+
+            // Copy to clipboard
+            navigator.clipboard.writeText(json).then(() => {
+                alert(`✅ Copied JSON for ${enrichments.length} phone numbers!\n\nNext steps:\n1. Create linkedin-profiles.json in automation-engine folder\n2. Paste the copied content\n3. Run: node test/enrich-from-linkedin-urls.mjs`);
+            }).catch(err => {
+                // Fallback
+                const textarea = document.createElement('textarea');
+                textarea.value = json;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert('✅ JSON copied to clipboard!');
+            });
+        }
+
+        // Render phone cards
+        document.getElementById('phone-list').innerHTML = phoneNumbers.map(createPhoneCard).join('');
+    </script>
+</body>
+</html>

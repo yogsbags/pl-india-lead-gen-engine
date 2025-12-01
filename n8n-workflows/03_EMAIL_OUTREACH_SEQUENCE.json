@@ -1,0 +1,378 @@
+{
+  "name": "Email Outreach Sequence - 5 Touch Campaign",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "HNI_Leads"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "column": "leadTier",
+              "condition": "equal",
+              "value": "Warm"
+            },
+            {
+              "column": "emailSequenceStarted",
+              "condition": "notEqual",
+              "value": "Yes"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Warm HNI Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [250, 300],
+      "id": "email-node-1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-oauth",
+          "name": "Google Sheets OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.name.split(' ')[0] }} - Systematic Investing That Delivered 76% Returns",
+        "emailType": "html",
+        "message": "=<!DOCTYPE html>\n<html>\n<body style=\"font-family: Arial, sans-serif; line-height: 1.6; color: #333;\">\n  <p>Hi {{ $json.name.split(' ')[0] }},</p>\n\n  <p>I'm Siddharth Vora, Fund Manager at PL Capital.</p>\n\n  <p>I noticed your role as {{ $json.title }} at {{ $json.company }}, and wanted to share something that might interest you.</p>\n\n  <p><strong>The Challenge Most HNIs Face:</strong></p>\n  <p>Despite strong economic growth, many HNI portfolios delivered only 10-12% returns in 2024. Meanwhile, systematic quantitative strategies generated significantly higher alpha.</p>\n\n  <p><strong>Our AQUA Strategy Case Study:</strong></p>\n  <ul>\n    <li>✅ <strong>76% returns</strong> in Year 1 (launched Jan 2024)</li>\n    <li>✅ <strong>37.5% alpha</strong> vs BSE 500 benchmark</li>\n    <li>✅ Achieved through systematic, bias-free investing</li>\n    <li>✅ Zero emotional decisions, 100% data-driven</li>\n  </ul>\n\n  <p>I've put together a detailed case study showing exactly how we achieved this.</p>\n\n  <p><a href=\"https://plindia.com/aqua-case-study?ref=email1&lead={{ $json.email }}\" style=\"display: inline-block; padding: 12px 24px; background-color: #0066cc; color: white; text-decoration: none; border-radius: 4px;\">Download AQUA Case Study</a></p>\n\n  <p>Best regards,<br>\n  Siddharth Vora<br>\n  Fund Manager & Executive Director<br>\n  PL Capital</p>\n\n  <hr style=\"border: none; border-top: 1px solid #eee; margin: 20px 0;\">\n  <p style=\"font-size: 12px; color: #666;\">Past performance does not guarantee future results. Investments in PMS are subject to market risks. Please read all scheme-related documents carefully. PL Capital is SEBI registered (INP000007021).</p>\n</body>\n</html>",
+        "options": {
+          "fromName": "Siddharth Vora - PL Capital"
+        }
+      },
+      "name": "Email 1 - Value Proposition",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [450, 300],
+      "id": "email-node-2",
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credentials",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "days"
+      },
+      "name": "Wait 3 Days",
+      "type": "n8n-nodes-base.wait",
+      "position": [650, 300],
+      "id": "email-node-3"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "Re: {{ $json.name.split(' ')[0] }} - How We Beat The Market By 37.5%",
+        "emailType": "html",
+        "message": "=<!DOCTYPE html>\n<html>\n<body style=\"font-family: Arial, sans-serif; line-height: 1.6; color: #333;\">\n  <p>Hi {{ $json.name.split(' ')[0] }},</p>\n\n  <p>Following up on my previous email about our AQUA strategy's 76% Year 1 returns.</p>\n\n  <p>I wanted to share the <strong>3 core principles</strong> that drove this performance:</p>\n\n  <p><strong>1. Market Regime Detection</strong><br>\n  We identify bull, bear, high volatility, and trending markets using 27 quantitative indicators. When 18+ align, we confirm the regime and adjust allocation accordingly.</p>\n\n  <p><strong>2. Factor Rotation</strong><br>\n  We track 6 primary factors (Value, Momentum, Quality, Low Volatility, Size, Growth). Top 2-3 factors get maximum allocation. Underperforming factors reduced to zero.</p>\n\n  <p><strong>3. Dynamic Asset Allocation</strong><br>\n  Unlike traditional 60-40 portfolios, AQUA ranges from 20% to 95% equity based on opportunity. In March 2020 crash, we went 90% equity. In Oct 2021 euphoria, we reduced to 35%.</p>\n\n  <p><strong>The Result?</strong><br>\n  76% return with LOWER volatility than the benchmark. Better returns with better sleep.</p>\n\n  <p>Would you like to see how this approach fits your portfolio?</p>\n\n  <p><a href=\"https://plindia.com/book-consultation?ref=email2&lead={{ $json.email }}\" style=\"display: inline-block; padding: 12px 24px; background-color: #0066cc; color: white; text-decoration: none; border-radius: 4px;\">Book a 30-Min Portfolio Review</a></p>\n\n  <p>Best regards,<br>\n  Siddharth Vora</p>\n\n  <hr style=\"border: none; border-top: 1px solid #eee; margin: 20px 0;\">\n  <p style=\"font-size: 12px; color: #666;\">Past performance does not guarantee future results. AQUA's 76% return is historical and may not be replicated. Investments in PMS involve risks including loss of principal. SEBI registered: INP000007021.</p>\n</body>\n</html>",
+        "options": {
+          "fromName": "Siddharth Vora - PL Capital"
+        }
+      },
+      "name": "Email 2 - Educational",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [850, 300],
+      "id": "email-node-4",
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credentials",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "days"
+      },
+      "name": "Wait 4 Days",
+      "type": "n8n-nodes-base.wait",
+      "position": [1050, 300],
+      "id": "email-node-5"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.name.split(' ')[0] }} - Client Case Study: ₹5 Cr → ₹8.8 Cr in 12 Months",
+        "emailType": "html",
+        "message": "=<!DOCTYPE html>\n<html>\n<body style=\"font-family: Arial, sans-serif; line-height: 1.6; color: #333;\">\n  <p>Hi {{ $json.name.split(' ')[0] }},</p>\n\n  <p>I wanted to share a real client story (anonymized for privacy).</p>\n\n  <p><strong>Profile:</strong> {{ $json.title }}, Manufacturing Industry, Age 48<br>\n  <strong>Portfolio Size:</strong> ₹5 Crore<br>\n  <strong>Goal:</strong> Beat market returns, 5-year horizon<br>\n  <strong>Risk Appetite:</strong> Moderate-High</p>\n\n  <p><strong>The Journey:</strong></p>\n  <ul>\n    <li><strong>Jan 2024:</strong> Invested ₹5 Cr in AQUA strategy</li>\n    <li><strong>Q1 2024:</strong> Portfolio: ₹6.1 Cr (+22%)</li>\n    <li><strong>Q2 2024:</strong> Portfolio: ₹7.3 Cr (+46%)</li>\n    <li><strong>Q3 2024:</strong> Portfolio: ₹8.0 Cr (+60%)</li>\n    <li><strong>Dec 2024:</strong> Portfolio: ₹8.8 Cr (+76%)</li>\n  </ul>\n\n  <p><strong>What Made The Difference?</strong></p>\n  <p>Our systematic approach removed emotion from investing. When markets crashed in March, he stayed invested (because data said so). When euphoria peaked in October, we reduced equity exposure (again, data-driven).</p>\n\n  <p><strong>His Words:</strong><br>\n  <em>\"For the first time in 20 years of investing, I'm not checking my portfolio daily. I trust the system, and the results speak for themselves.\"</em></p>\n\n  <p>Could this work for you?</p>\n\n  <p><a href=\"https://plindia.com/book-consultation?ref=email3&lead={{ $json.email }}\" style=\"display: inline-block; padding: 12px 24px; background-color: #0066cc; color: white; text-decoration: none; border-radius: 4px;\">Let's Discuss Your Portfolio</a></p>\n\n  <p>Best regards,<br>\n  Siddharth Vora</p>\n\n  <hr style=\"border: none; border-top: 1px solid #eee; margin: 20px 0;\">\n  <p style=\"font-size: 12px; color: #666;\">Case study is anonymized. Individual results may vary. Past performance does not guarantee future results. SEBI registered: INP000007021.</p>\n</body>\n</html>",
+        "options": {
+          "fromName": "Siddharth Vora - PL Capital"
+        }
+      },
+      "name": "Email 3 - Social Proof",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [1250, 300],
+      "id": "email-node-6",
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credentials",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "days"
+      },
+      "name": "Wait 5 Days",
+      "type": "n8n-nodes-base.wait",
+      "position": [1450, 300],
+      "id": "email-node-7"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.name.split(' ')[0] }} - Common Objection: \"But 2% Fees Are High\"",
+        "emailType": "html",
+        "message": "=<!DOCTYPE html>\n<html>\n<body style=\"font-family: Arial, sans-serif; line-height: 1.6; color: #333;\">\n  <p>Hi {{ $json.name.split(' ')[0] }},</p>\n\n  <p>Many HNIs ask me: <strong>\"Why pay 2% when index funds charge 0.1%?\"</strong></p>\n\n  <p>It's a valid question. Let me put it in perspective:</p>\n\n  <p><strong>₹1 Crore invested over 5 years:</strong></p>\n\n  <table style=\"border-collapse: collapse; width: 100%; margin: 20px 0;\">\n    <tr style=\"background-color: #f5f5f5;\">\n      <th style=\"border: 1px solid #ddd; padding: 12px; text-align: left;\">Strategy</th>\n      <th style=\"border: 1px solid #ddd; padding: 12px; text-align: left;\">Return</th>\n      <th style=\"border: 1px solid #ddd; padding: 12px; text-align: left;\">Fees</th>\n      <th style=\"border: 1px solid #ddd; padding: 12px; text-align: left;\">Final Value</th>\n    </tr>\n    <tr>\n      <td style=\"border: 1px solid #ddd; padding: 12px;\">Index Fund</td>\n      <td style=\"border: 1px solid #ddd; padding: 12px;\">12%</td>\n      <td style=\"border: 1px solid #ddd; padding: 12px;\">0.1%</td>\n      <td style=\"border: 1px solid #ddd; padding: 12px;\">₹1.75 Cr</td>\n    </tr>\n    <tr style=\"background-color: #e8f4f8;\">\n      <td style=\"border: 1px solid #ddd; padding: 12px;\"><strong>AQUA Strategy</strong></td>\n      <td style=\"border: 1px solid #ddd; padding: 12px;\"><strong>20%</strong></td>\n      <td style=\"border: 1px solid #ddd; padding: 12px;\"><strong>2%</strong></td>\n      <td style=\"border: 1px solid #ddd; padding: 12px;\"><strong>₹2.33 Cr</strong></td>\n    </tr>\n  </table>\n\n  <p><strong>The difference: ₹58 lakh more</strong> - even after paying higher fees.</p>\n\n  <p>The real question isn't \"What are the fees?\"<br>\n  It's \"What are the NET returns after fees?\"</p>\n\n  <p>Index funds match the market at low cost.<br>\n  AQUA aims to <strong>beat the market significantly</strong>.</p>\n\n  <p><strong>Your Choice:</strong></p>\n  <ul>\n    <li>Pay 0.1% fees, get market returns (12%)</li>\n    <li>Pay 2% fees, get alpha returns (20%+)</li>\n  </ul>\n\n  <p>Which creates more wealth?</p>\n\n  <p><a href=\"https://plindia.com/book-consultation?ref=email4&lead={{ $json.email }}\" style=\"display: inline-block; padding: 12px 24px; background-color: #0066cc; color: white; text-decoration: none; border-radius: 4px;\">Let's Calculate Your Potential</a></p>\n\n  <p>Best regards,<br>\n  Siddharth Vora</p>\n\n  <hr style=\"border: none; border-top: 1px solid #eee; margin: 20px 0;\">\n  <p style=\"font-size: 12px; color: #666;\">Hypothetical example for illustration. Actual returns may vary. Past performance (20% avg) does not guarantee future results. SEBI registered: INP000007021.</p>\n</body>\n</html>",
+        "options": {
+          "fromName": "Siddharth Vora - PL Capital"
+        }
+      },
+      "name": "Email 4 - Objection Handling",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [1650, 300],
+      "id": "email-node-8",
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credentials",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 7,
+        "unit": "days"
+      },
+      "name": "Wait 7 Days",
+      "type": "n8n-nodes-base.wait",
+      "position": [1850, 300],
+      "id": "email-node-9"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.name.split(' ')[0] }} - Final Invitation: 30 Minutes Could Change Your Wealth Trajectory",
+        "emailType": "html",
+        "message": "=<!DOCTYPE html>\n<html>\n<body style=\"font-family: Arial, sans-serif; line-height: 1.6; color: #333;\">\n  <p>Hi {{ $json.name.split(' ')[0] }},</p>\n\n  <p>Over the past few weeks, I've shared:</p>\n  <ul>\n    <li>✅ How AQUA delivered <strong>76% returns</strong> in Year 1</li>\n    <li>✅ The <strong>3 core principles</strong> behind our systematic approach</li>\n    <li>✅ A real client case study (<strong>₹5 Cr → ₹8.8 Cr</strong>)</li>\n    <li>✅ Why <strong>2% fees deliver ₹58 lakh more</strong> than 0.1% index funds</li>\n  </ul>\n\n  <p>But here's what I haven't shared yet: <strong>How this specifically applies to YOUR portfolio.</strong></p>\n\n  <p>Every HNI's situation is unique:</p>\n  <ul>\n    <li>Different risk tolerance</li>\n    <li>Different liquidity needs</li>\n    <li>Different tax situations</li>\n    <li>Different wealth goals</li>\n  </ul>\n\n  <p>That's why I'm personally inviting you to a <strong>30-minute portfolio review call</strong>.</p>\n\n  <p><strong>In this call, I'll:</strong></p>\n  <ol>\n    <li>Review your current portfolio positioning</li>\n    <li>Identify gaps and opportunities</li>\n    <li>Show exactly how AQUA/MADP fits your strategy</li>\n    <li>Answer any questions you have</li>\n  </ol>\n\n  <p><strong>No sales pitch. No pressure. Just insights.</strong></p>\n\n  <p>If after the call you feel our strategies aren't right for you, no problem. You'll still walk away with valuable portfolio insights.</p>\n\n  <p>But if you see the potential - and most HNIs do - we can discuss next steps.</p>\n\n  <p><a href=\"https://plindia.com/book-consultation?ref=email5&lead={{ $json.email }}\" style=\"display: inline-block; padding: 12px 24px; background-color: #0066cc; color: white; text-decoration: none; border-radius: 4px;\">Book Your 30-Minute Call</a></p>\n\n  <p>I have limited slots this month. Secure yours now.</p>\n\n  <p>Looking forward to our conversation,<br>\n  Siddharth Vora<br>\n  Fund Manager & Executive Director<br>\n  PL Capital</p>\n\n  <p>P.S. If timing isn't right now, no worries. I'll add you to our monthly newsletter where I share market insights and strategy updates. You can always reach out when ready.</p>\n\n  <hr style=\"border: none; border-top: 1px solid #eee; margin: 20px 0;\">\n  <p style=\"font-size: 12px; color: #666;\">Past performance does not guarantee future results. Investments in PMS are subject to market risks. Please read all scheme-related documents carefully. PL Capital is SEBI registered (INP000007021).</p>\n</body>\n</html>",
+        "options": {
+          "fromName": "Siddharth Vora - PL Capital"
+        }
+      },
+      "name": "Email 5 - Final CTA",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [2050, 300],
+      "id": "email-node-10",
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credentials",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "HNI_Leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "emailSequenceStarted": "Yes",
+            "emailSequenceCompleted": "Yes",
+            "lastEmailSent": "={{ new Date().toISOString() }}"
+          }
+        },
+        "options": {
+          "lookupColumn": "email",
+          "lookupValue": "={{ $json.email }}"
+        }
+      },
+      "name": "Update Lead Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [2250, 300],
+      "id": "email-node-11",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-oauth",
+          "name": "Google Sheets OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_SLACK_CHANNEL_ID"
+        },
+        "text": "=✅ **Email Sequence Completed**\\n\\n*Lead:* {{ $json.name }}\\n*Email:* {{ $json.email }}\\n*Company:* {{ $json.company }}\\n*Score:* {{ $json.leadScore }}\\n\\n*5 emails sent over 19 days*\\n\\nNext action: Monitor for response or book consultation",
+        "otherOptions": {}
+      },
+      "name": "Notify Team",
+      "type": "n8n-nodes-base.slack",
+      "position": [2450, 300],
+      "id": "email-node-12",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "slack-oauth",
+          "name": "Slack OAuth"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Get Warm HNI Leads": {
+      "main": [
+        [
+          {
+            "node": "Email 1 - Value Proposition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email 1 - Value Proposition": {
+      "main": [
+        [
+          {
+            "node": "Wait 3 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3 Days": {
+      "main": [
+        [
+          {
+            "node": "Email 2 - Educational",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email 2 - Educational": {
+      "main": [
+        [
+          {
+            "node": "Wait 4 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 4 Days": {
+      "main": [
+        [
+          {
+            "node": "Email 3 - Social Proof",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email 3 - Social Proof": {
+      "main": [
+        [
+          {
+            "node": "Wait 5 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 5 Days": {
+      "main": [
+        [
+          {
+            "node": "Email 4 - Objection Handling",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email 4 - Objection Handling": {
+      "main": [
+        [
+          {
+            "node": "Wait 7 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 7 Days": {
+      "main": [
+        [
+          {
+            "node": "Email 5 - Final CTA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email 5 - Final CTA": {
+      "main": [
+        [
+          {
+            "node": "Update Lead Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead Status": {
+      "main": [
+        [
+          {
+            "node": "Notify Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "versionId": "1"
+}

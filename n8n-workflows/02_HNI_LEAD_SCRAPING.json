@@ -1,0 +1,339 @@
+{
+  "name": "HNI Lead Scraping & Enrichment",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// HNI segment LinkedIn search queries\nconst queries = [\n  {\n    \"title\": \"CEO\",\n    \"location\": \"Mumbai, India\",\n    \"industry\": \"Technology\",\n    \"companySize\": \"51-500\",\n    \"education\": \"IIT OR IIM\"\n  },\n  {\n    \"title\": \"Founder\",\n    \"location\": \"Bangalore, India\",\n    \"industry\": \"Technology OR E-commerce\",\n    \"companySize\": \"51-500\",\n    \"education\": \"IIT OR IIM\"\n  },\n  {\n    \"title\": \"CFO\",\n    \"location\": \"Delhi NCR, India\",\n    \"industry\": \"Manufacturing OR FMCG\",\n    \"companySize\": \"51-1000\"\n  },\n  {\n    \"title\": \"Managing Director\",\n    \"location\": \"Pune, India\",\n    \"industry\": \"Healthcare OR Pharmaceuticals\",\n    \"companySize\": \"51-500\"\n  },\n  {\n    \"title\": \"Director\",\n    \"location\": \"Hyderabad, India\",\n    \"industry\": \"Technology OR Consulting\",\n    \"companySize\": \"51-1000\"\n  },\n  {\n    \"title\": \"Vice President\",\n    \"location\": \"Chennai, India\",\n    \"industry\": \"Banking OR Financial Services\",\n    \"companySize\": \"500-5000\"\n  }\n];\n\nreturn queries.map(q => ({ json: q }));"
+      },
+      "name": "Define HNI Queries",
+      "type": "n8n-nodes-base.code",
+      "position": [250, 300],
+      "id": "hni-node-1"
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "url": "https://api.apify.com/v2/acts/code_crafter~leads-finder/runs",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"searchQueries\": [\n    {\n      \"title\": \"{{ $json.title }}\",\n      \"location\": \"{{ $json.location }}\",\n      \"industry\": \"{{ $json.industry }}\",\n      \"companySize\": \"{{ $json.companySize }}\",\n      \"education\": \"{{ $json.education }}\"\n    }\n  ],\n  \"maxResults\": 350,\n  \"includeEmail\": true,\n  \"includePhone\": true\n}",
+        "options": {}
+      },
+      "name": "Apify - Scrape HNIs",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [450, 300],
+      "id": "hni-node-2",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "apify-api-key",
+          "name": "Apify API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 240,
+        "unit": "seconds"
+      },
+      "name": "Wait for Scraping",
+      "type": "n8n-nodes-base.wait",
+      "position": [650, 300],
+      "id": "hni-node-3"
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "url": "=https://api.apify.com/v2/datasets/{{ $json.data.defaultDatasetId }}/items?format=json",
+        "method": "GET",
+        "options": {}
+      },
+      "name": "Get Scraped Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [850, 300],
+      "id": "hni-node-4",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "apify-api-key",
+          "name": "Apify API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Lead scoring for HNI segment\nconst lead = $input.item.json;\n\nlet score = 0;\n\n// Net worth indicators (0-30 points)\nlet netWorthIndicators = 0;\nif (lead.company && lead.companySize?.includes('500-5000')) netWorthIndicators++;\nif (lead.title && (lead.title.includes('CEO') || lead.title.includes('Founder') || lead.title.includes('CFO'))) netWorthIndicators++;\nif (lead.education && (lead.education.includes('IIT') || lead.education.includes('IIM') || lead.education.includes('Harvard') || lead.education.includes('Stanford'))) netWorthIndicators++;\nif (lead.location && (lead.location.includes('Mumbai') || lead.location.includes('Delhi') || lead.location.includes('Bangalore'))) netWorthIndicators++;\n\nif (netWorthIndicators >= 3) score += 30;\nelse if (netWorthIndicators === 2) score += 20;\nelse if (netWorthIndicators === 1) score += 10;\n\n// Role level (0-20 points)\nif (lead.title?.match(/CEO|Founder|CFO|Managing Director/i)) score += 20;\nelse if (lead.title?.match(/VP|Vice President|Director/i)) score += 15;\nelse if (lead.title?.match(/Senior Manager|Manager/i)) score += 10;\n\n// Education (0-15 points)\nif (lead.education?.match(/IIM|IIT|Harvard|Stanford|Wharton|Oxford|Cambridge/i)) score += 15;\nelse if (lead.education?.match(/Top B-School|Foreign University/i)) score += 10;\nelse score += 5;\n\n// LinkedIn engagement (0-15 points)\nif (lead.posts > 20 || lead.activityLevel === 'very_high') score += 15;\nelse if (lead.posts > 10 || lead.activityLevel === 'high') score += 10;\nelse if (lead.posts > 5 || lead.activityLevel === 'medium') score += 5;\n\n// Age range (0-10 points) - estimate from experience years\nconst experienceMatch = lead.experience?.match(/(\\d+)\\+?\\s*years?/i);\nif (experienceMatch) {\n  const experience = parseInt(experienceMatch[1]);\n  const estimatedAge = 22 + experience; // Assuming graduation at 22\n  if (estimatedAge >= 40 && estimatedAge <= 55) score += 10;\n  else if ((estimatedAge >= 35 && estimatedAge < 40) || (estimatedAge > 55 && estimatedAge <= 60)) score += 7;\n  else score += 3;\n}\n\n// Location (0-10 points)\nif (lead.location?.match(/Mumbai|Delhi NCR|Bangalore/i)) score += 10;\nelse if (lead.location?.match(/Pune|Hyderabad|Chennai/i)) score += 7;\nelse score += 5;\n\n// Return enriched lead with score\nreturn {\n  json: {\n    ...lead,\n    leadScore: score,\n    leadTier: score >= 80 ? 'Hot' : score >= 60 ? 'Warm' : 'Cold',\n    segment: 'HNI',\n    scrapedDate: new Date().toISOString()\n  }\n};"
+      },
+      "name": "Score HNI Leads",
+      "type": "n8n-nodes-base.code",
+      "position": [1050, 300],
+      "id": "hni-node-5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.leadScore }}",
+              "operation": "largerEqual",
+              "value2": 60
+            }
+          ]
+        }
+      },
+      "name": "Filter Qualified Leads",
+      "type": "n8n-nodes-base.if",
+      "position": [1250, 300],
+      "id": "hni-node-6"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "HNI_Leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "name": "={{ $json.name }}",
+            "title": "={{ $json.title }}",
+            "company": "={{ $json.company }}",
+            "email": "={{ $json.email }}",
+            "phone": "={{ $json.phone }}",
+            "linkedinUrl": "={{ $json.linkedinUrl }}",
+            "location": "={{ $json.location }}",
+            "education": "={{ $json.education }}",
+            "leadScore": "={{ $json.leadScore }}",
+            "leadTier": "={{ $json.leadTier }}",
+            "scrapedDate": "={{ $json.scrapedDate }}"
+          }
+        },
+        "options": {}
+      },
+      "name": "Save to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [1450, 200],
+      "id": "hni-node-7",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-oauth",
+          "name": "Google Sheets OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.leadScore }}",
+              "operation": "largerEqual",
+              "value2": 80
+            }
+          ]
+        }
+      },
+      "name": "Hot HNI Leads",
+      "type": "n8n-nodes-base.if",
+      "position": [1450, 400],
+      "id": "hni-node-8"
+    },
+    {
+      "parameters": {
+        "avatar_id": "9da4afb2c22441b5aab73369dda7f65d",
+        "voice_id": "c8d184ef4d81484a97d70c94bb76fec3",
+        "input_text": "=Hi {{ $json.name.split(' ')[0] }},\n\nI'm Siddharth Vora, Fund Manager at PL Capital.\n\nI noticed your impressive role as {{ $json.title }} at {{ $json.company }}, and wanted to reach out personally.\n\nMany {{ $json.title }}s I work with face the challenge of portfolio underperformance. Our AQUA strategy delivered 76% returns in Year 1 through systematic, quantitative investing.\n\nI'd love to show you how our data-driven approach could enhance your portfolio returns.\n\nCan we schedule a brief call this week?\n\nBest regards,\nSiddharth Vora",
+        "title": "=Personalized Outreach - {{ $json.name }}"
+      },
+      "name": "Generate HeyGen Video",
+      "type": "n8n-nodes-base.heygenGenerateVideo",
+      "position": [1650, 500],
+      "id": "hni-node-9",
+      "credentials": {
+        "heygenApi": {
+          "id": "heygen-api",
+          "name": "HeyGen API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.name.split(' ')[0] }} - A Personal Message from Siddharth Vora",
+        "message": "=Hi {{ $json.name.split(' ')[0] }},\n\nI've recorded a personal video message for you:\n\n[Watch Video: {{ $node[\"Generate HeyGen Video\"].json.video_url }}]\n\nLooking forward to connecting.\n\nBest regards,\nSiddharth Vora\nFund Manager, PL Capital\n\n---\nPast performance does not guarantee future results. Investments in PMS are subject to market risks.\nPL Capital is SEBI registered (INP000007021).",
+        "options": {
+          "ccList": "bd-team@plindia.com",
+          "bccList": "",
+          "fromName": "Siddharth Vora - PL Capital"
+        }
+      },
+      "name": "Send Personalized Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [1850, 500],
+      "id": "hni-node-10",
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credentials",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nconst totalLeads = items.length;\nconst hotLeads = items.filter(item => item.json.leadScore >= 80).length;\nconst warmLeads = items.filter(item => item.json.leadScore >= 60 && item.json.leadScore < 80).length;\n\nconst summary = {\n  totalScraped: totalLeads,\n  qualified: hotLeads + warmLeads,\n  hot: hotLeads,\n  warm: warmLeads,\n  videosGenerated: hotLeads,\n  emailsSent: hotLeads,\n  scrapeDate: new Date().toISOString(),\n  segment: 'HNI'\n};\n\nreturn [{ json: summary }];"
+      },
+      "name": "Generate Summary",
+      "type": "n8n-nodes-base.code",
+      "position": [1650, 200],
+      "id": "hni-node-11"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_SLACK_CHANNEL_ID"
+        },
+        "text": "=📊 **HNI Lead Scraping Complete**\\n\\n*Total Scraped:* {{ $json.totalScraped }}\\n*Qualified Leads:* {{ $json.qualified }}\\n  - 🔥 Hot (80+): {{ $json.hot }}\\n  - 🌡️ Warm (60-79): {{ $json.warm }}\\n\\n*Personalized Videos Generated:* {{ $json.videosGenerated }}\\n*Outreach Emails Sent:* {{ $json.emailsSent }}\\n\\n*Date:* {{ $json.scrapeDate }}\\n\\nLeads saved to Google Sheets: HNI_Leads",
+        "otherOptions": {}
+      },
+      "name": "Send Summary to Slack",
+      "type": "n8n-nodes-base.slack",
+      "position": [1850, 200],
+      "id": "hni-node-12",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "slack-oauth",
+          "name": "Slack OAuth"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Define HNI Queries": {
+      "main": [
+        [
+          {
+            "node": "Apify - Scrape HNIs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify - Scrape HNIs": {
+      "main": [
+        [
+          {
+            "node": "Wait for Scraping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Scraping": {
+      "main": [
+        [
+          {
+            "node": "Get Scraped Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Scraped Data": {
+      "main": [
+        [
+          {
+            "node": "Score HNI Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score HNI Leads": {
+      "main": [
+        [
+          {
+            "node": "Filter Qualified Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Qualified Leads": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Hot HNI Leads",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Generate Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hot HNI Leads": {
+      "main": [
+        [
+          {
+            "node": "Generate HeyGen Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate HeyGen Video": {
+      "main": [
+        [
+          {
+            "node": "Send Personalized Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Summary": {
+      "main": [
+        [
+          {
+            "node": "Send Summary to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
