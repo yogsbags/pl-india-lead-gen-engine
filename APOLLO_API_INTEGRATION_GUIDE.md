@@ -1,7 +1,7 @@
 # Apollo.io API Integration Guide
 
 **Created:** 2025-10-17
-**Purpose:** Complete reference for Apollo.io API integration in PL Capital lead generation workflows
+**Purpose:** Complete reference for Apollo.io API integration in lead generation workflows
 **API Documentation:** https://docs.apollo.io/
 
 ---
