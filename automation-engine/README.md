@@ -89,7 +89,8 @@ Set the following environment variables (or add them to `.env.local`):
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`
 - `SLACK_BOT_TOKEN`, `SLACK_CHANNEL_ID`
 - `HEYGEN_API_KEY` (for HNI hot leads)
-- `POSTMARK_SERVER_TOKEN`, `POSTMARK_FROM_EMAIL`, `POSTMARK_MESSAGE_STREAM` (default `outbound`)
+- `MOENGAGE_WORKSPACE_ID`, `MOENGAGE_DATA_API_KEY`, `MOENGAGE_REPORTING_API_KEY` (primary email provider)
+- `POSTMARK_SERVER_TOKEN`, `POSTMARK_FROM_EMAIL`, `POSTMARK_MESSAGE_STREAM` (fallback email provider, default `outbound`)
 
 Then run with:
 
@@ -97,7 +98,7 @@ Then run with:
 node main.js run --segment hni --live
 ```
 
-> ℹ️ Live mode (`--live`) attempts real Apify runs using the `apify~apollo-scraper` actor. If the request fails or returns empty results, the workflow automatically falls back to deterministic simulated data so downstream nodes can still execute. When `POSTMARK_SERVER_TOKEN` is present, the workflow also emails Hot/Warm leads via Postmark using the first template for each segment.
+> ℹ️ Live mode (`--live`) attempts real Apify runs using the `apify~apollo-scraper` actor. If the request fails or returns empty results, the workflow automatically falls back to deterministic simulated data so downstream nodes can still execute. Email dispatch uses MoEngage as primary provider (when configured) with Postmark as automatic fallback. See `docs/MOENGAGE_INTEGRATION.md` for details.
 
 ## 📊 Workflow Stages
 

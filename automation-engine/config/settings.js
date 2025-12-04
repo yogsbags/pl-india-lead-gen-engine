@@ -39,6 +39,18 @@ const settings = {
     enabled: getEnv('HEYGEN_API_KEY') ? true : false,
     apiKey: getEnv('HEYGEN_API_KEY', '')
   },
+  moengage: {
+    enabled: Boolean(
+      getEnv('MOENGAGE_WORKSPACE_ID') &&
+      getEnv('MOENGAGE_DATA_API_KEY') &&
+      getEnv('MOENGAGE_REPORTING_API_KEY')
+    ),
+    workspaceId: getEnv('MOENGAGE_WORKSPACE_ID', ''),
+    dataApiKey: getEnv('MOENGAGE_DATA_API_KEY', ''),
+    reportingApiKey: getEnv('MOENGAGE_REPORTING_API_KEY', ''),
+    baseUrl: getEnv('MOENGAGE_BASE_URL', 'https://api-01.moengage.com'),
+    reportsBaseUrl: getEnv('MOENGAGE_REPORTS_BASE_URL', 'https://api-01.moengage.com')
+  },
   postmark: {
     enabled: Boolean(getEnv('POSTMARK_SERVER_TOKEN')),
     serverToken: getEnv('POSTMARK_SERVER_TOKEN', ''),

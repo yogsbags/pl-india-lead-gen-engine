@@ -18,6 +18,7 @@ import VideoPersonalizationNode from '../nodes/video-personalization-node.js';
 import NewsletterEnqueueNode from '../nodes/newsletter-enqueue-node.js';
 import ExecutiveBriefingNode from '../nodes/executive-briefing-node.js';
 import PostmarkSendNode from '../nodes/postmark-send-node.js';
+import EmailSendNode from '../nodes/email-send-node.js';
 import CsvExportNode from '../nodes/csv-export-node.js';
 import IntentSignalNode from '../nodes/intent-signal-node.js';
 import SignalScoringNode from '../nodes/signal-scoring-node.js';
@@ -46,6 +47,7 @@ export default class WorkflowOrchestrator {
       NewsletterEnqueueNode,
       ExecutiveBriefingNode,
       PostmarkSendNode,
+      EmailSendNode,
       CsvExportNode,
       IntentSignalNode,
       SignalScoringNode,

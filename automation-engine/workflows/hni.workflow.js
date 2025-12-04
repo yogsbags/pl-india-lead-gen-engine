@@ -21,7 +21,7 @@ export default {
     },
     { id: 'sheets', handler: 'GoogleSheetsNode', name: 'Google Sheets Upsert' },
     { id: 'email', handler: 'EmailSequenceNode', name: 'Email Sequence Enqueue' },
-    { id: 'postmark', handler: 'PostmarkSendNode', name: 'Postmark Dispatch' },
+    { id: 'email-send', handler: 'EmailSendNode', name: 'Email Dispatch (MoEngage/Postmark)' },
     { id: 'slack', handler: 'SlackNotifierNode', name: 'Slack Summary' },
     { id: 'summary', handler: 'SummaryReportNode', name: 'Execution Summary' }
   ]
