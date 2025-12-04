@@ -1,0 +1,209 @@
+import { NextRequest, NextResponse } from 'next/server'
+import axios from 'axios'
+
+interface EnrichmentRequest {
+  leads: Array<{
+    id: string
+    first_name: string
+    last_name: string
+    organization?: {
+      name?: string
+      website_url?: string
+    }
+    linkedin_url?: string
+  }>
+}
+
+interface ApolloPhoneNumber {
+  raw_number?: string
+  sanitized_number?: string
+  type?: string
+  position?: number
+}
+
+interface ApolloEnrichedPerson {
+  id: string
+  first_name: string
+  last_name: string
+  name: string
+  email?: string
+  email_status?: string
+  email_confidence_score?: number
+  phone_numbers?: ApolloPhoneNumber[]
+  mobile_phone?: string
+  corporate_phone?: string
+  title?: string
+  headline?: string
+  linkedin_url?: string
+  twitter_url?: string
+  facebook_url?: string
+  organization?: {
+    id?: string
+    name?: string
+    website_url?: string
+    primary_domain?: string
+    industry?: string
+    keywords?: string[]
+    estimated_num_employees?: number
+    annual_revenue?: number
+    total_funding?: number
+    city?: string
+    state?: string
+    country?: string
+  }
+  departments?: string[]
+  subdepartments?: string[]
+  functions?: string[]
+  seniority?: string
+}
+
+interface EnrichedLead {
+  id: string
+  name: string
+  first_name: string
+  last_name: string
+  email: string
+  email_confidence: number
+  phone?: string
+  mobile_phone?: string
+  corporate_phone?: string
+  title?: string
+  headline?: string
+  linkedin_url?: string
+  company?: string
+  company_website?: string
+  industry?: string
+  employee_count?: number
+  annual_revenue?: number
+  city?: string
+  state?: string
+  country?: string
+  seniority?: string
+  departments?: string[]
+}
+
+/**
+ * Apollo Lead Enrichment API Route
+ *
+ * Enriches leads with email addresses, phone numbers, and company data
+ * Filters leads with email_confidence_score > 80%
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body: EnrichmentRequest = await request.json()
+    const { leads } = body
+
+    // Validate input
+    if (!leads || !Array.isArray(leads) || leads.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'leads array is required and must not be empty' },
+        { status: 400 }
+      )
+    }
+
+    // Call Apollo Enrichment API
+    const apolloApiKey = process.env.APOLLO_API_KEY
+    if (!apolloApiKey) {
+      return NextResponse.json(
+        { success: false, error: 'APOLLO_API_KEY not configured' },
+        { status: 500 }
+      )
+    }
+
+    const enrichedLeads: EnrichedLead[] = []
+    const failedLeads: string[] = []
+    let totalConfidence = 0
+
+    // Enrich each lead (Apollo People Match API)
+    for (const lead of leads) {
+      try {
+        const response = await axios.post<{ person: ApolloEnrichedPerson }>(
+          'https://api.apollo.io/v1/people/match',
+          {
+            first_name: lead.first_name,
+            last_name: lead.last_name,
+            organization_name: lead.organization?.name,
+            domain: lead.organization?.website_url,
+            linkedin_url: lead.linkedin_url,
+            reveal_personal_emails: true,
+            reveal_phone_number: true
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Api-Key': apolloApiKey
+            }
+          }
+        )
+
+        const person = response.data.person
+
+        // Only include leads with email and confidence > 80%
+        if (person.email && person.email_confidence_score && person.email_confidence_score > 80) {
+          totalConfidence += person.email_confidence_score
+
+          enrichedLeads.push({
+            id: person.id,
+            name: person.name,
+            first_name: person.first_name,
+            last_name: person.last_name,
+            email: person.email,
+            email_confidence: person.email_confidence_score,
+            phone: person.phone_numbers?.[0]?.sanitized_number,
+            mobile_phone: person.mobile_phone,
+            corporate_phone: person.corporate_phone,
+            title: person.title,
+            headline: person.headline,
+            linkedin_url: person.linkedin_url,
+            company: person.organization?.name,
+            company_website: person.organization?.website_url,
+            industry: person.organization?.industry,
+            employee_count: person.organization?.estimated_num_employees,
+            annual_revenue: person.organization?.annual_revenue,
+            city: person.organization?.city,
+            state: person.organization?.state,
+            country: person.organization?.country,
+            seniority: person.seniority,
+            departments: person.departments
+          })
+        } else {
+          failedLeads.push(`${lead.first_name} ${lead.last_name} (low email confidence or no email)`)
+        }
+
+        // Rate limiting: Sleep 100ms between requests
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+      } catch (error: any) {
+        console.error(`Enrichment failed for ${lead.first_name} ${lead.last_name}:`, error.response?.data || error.message)
+        failedLeads.push(`${lead.first_name} ${lead.last_name} (API error)`)
+      }
+    }
+
+    const avgConfidence = enrichedLeads.length > 0 ? totalConfidence / enrichedLeads.length : 0
+
+    return NextResponse.json({
+      success: true,
+      leads: enrichedLeads,
+      stats: {
+        total: leads.length,
+        enriched: enrichedLeads.length,
+        with_email: enrichedLeads.length,
+        with_phone: enrichedLeads.filter(l => l.phone).length,
+        avg_confidence: Math.round(avgConfidence * 10) / 10,
+        failed: failedLeads.length
+      },
+      failedLeads: failedLeads.length > 0 ? failedLeads : undefined
+    })
+
+  } catch (error: any) {
+    console.error('Apollo enrichment error:', error.response?.data || error.message)
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to enrich leads'
+      },
+      { status: 500 }
+    )
+  }
+}
+
