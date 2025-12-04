@@ -87,6 +87,8 @@ interface EnrichedLead {
  *
  * Enriches leads with email addresses, phone numbers, and company data
  * Filters leads with email_confidence_score > 80%
+ *
+ * **Bulk Optimization**: Uses Apollo's bulk_match endpoint for multiple leads (faster, fewer API calls)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -114,8 +116,93 @@ export async function POST(request: NextRequest) {
     const failedLeads: string[] = []
     let totalConfidence = 0
 
-    // Enrich each lead (Apollo People Match API)
-    for (const lead of leads) {
+    // Use bulk endpoint for multiple leads, single endpoint for one lead
+    const useBulkApi = leads.length > 1
+
+    if (useBulkApi) {
+      // **BULK ENRICHMENT** - Process all leads in single API call
+      try {
+        // Prepare bulk match request
+        const bulkRequestBody = {
+          details: leads.map(lead => ({
+            first_name: lead.first_name,
+            last_name: lead.last_name,
+            organization_name: lead.organization?.name,
+            domain: lead.organization?.website_url,
+            linkedin_url: lead.linkedin_url
+          })),
+          reveal_personal_emails: true,
+          reveal_phone_number: true
+        }
+
+        const response = await axios.post<{ matches: ApolloEnrichedPerson[] }>(
+          'https://api.apollo.io/v1/people/bulk_match',
+          bulkRequestBody,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Api-Key': apolloApiKey
+            }
+          }
+        )
+
+        const matches = response.data.matches || []
+
+        // Process bulk results
+        for (let i = 0; i < leads.length; i++) {
+          const lead = leads[i]
+          const person = matches[i]
+
+          if (!person) {
+            failedLeads.push(`${lead.first_name} ${lead.last_name} (no match found)`)
+            continue
+          }
+
+          // Only include leads with email and confidence > 80%
+          if (person.email && person.email_confidence_score && person.email_confidence_score > 80) {
+            totalConfidence += person.email_confidence_score
+
+            enrichedLeads.push({
+              id: person.id,
+              name: person.name,
+              first_name: person.first_name,
+              last_name: person.last_name,
+              email: person.email,
+              email_confidence: person.email_confidence_score,
+              phone: person.phone_numbers?.[0]?.sanitized_number,
+              mobile_phone: person.mobile_phone,
+              corporate_phone: person.corporate_phone,
+              title: person.title,
+              headline: person.headline,
+              linkedin_url: person.linkedin_url,
+              company: person.organization?.name,
+              company_website: person.organization?.website_url,
+              industry: person.organization?.industry,
+              employee_count: person.organization?.estimated_num_employees,
+              annual_revenue: person.organization?.annual_revenue,
+              city: person.organization?.city,
+              state: person.organization?.state,
+              country: person.organization?.country,
+              seniority: person.seniority,
+              departments: person.departments
+            })
+          } else {
+            failedLeads.push(`${lead.first_name} ${lead.last_name} (low email confidence or no email)`)
+          }
+        }
+
+      } catch (error: any) {
+        console.error('Bulk enrichment error:', error.response?.data || error.message)
+
+        // Fallback to sequential enrichment if bulk API fails
+        console.warn('Bulk API failed, falling back to sequential enrichment...')
+        return await fallbackToSequentialEnrichment(leads, apolloApiKey)
+      }
+
+    } else {
+      // **SINGLE LEAD ENRICHMENT** - Use original single-person endpoint
+      const lead = leads[0]
+
       try {
         const response = await axios.post<{ person: ApolloEnrichedPerson }>(
           'https://api.apollo.io/v1/people/match',
@@ -170,9 +257,6 @@ export async function POST(request: NextRequest) {
           failedLeads.push(`${lead.first_name} ${lead.last_name} (low email confidence or no email)`)
         }
 
-        // Rate limiting: Sleep 100ms between requests
-        await new Promise(resolve => setTimeout(resolve, 100))
-
       } catch (error: any) {
         console.error(`Enrichment failed for ${lead.first_name} ${lead.last_name}:`, error.response?.data || error.message)
         failedLeads.push(`${lead.first_name} ${lead.last_name} (API error)`)
@@ -190,7 +274,8 @@ export async function POST(request: NextRequest) {
         with_email: enrichedLeads.length,
         with_phone: enrichedLeads.filter(l => l.phone).length,
         avg_confidence: Math.round(avgConfidence * 10) / 10,
-        failed: failedLeads.length
+        failed: failedLeads.length,
+        bulk_api_used: useBulkApi
       },
       failedLeads: failedLeads.length > 0 ? failedLeads : undefined
     })
@@ -205,5 +290,96 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+/**
+ * Fallback to sequential enrichment if bulk API fails
+ */
+async function fallbackToSequentialEnrichment(leads: any[], apolloApiKey: string) {
+  const enrichedLeads: EnrichedLead[] = []
+  const failedLeads: string[] = []
+  let totalConfidence = 0
+
+  // Enrich each lead sequentially with rate limiting
+  for (const lead of leads) {
+    try {
+      const response = await axios.post<{ person: ApolloEnrichedPerson }>(
+        'https://api.apollo.io/v1/people/match',
+        {
+          first_name: lead.first_name,
+          last_name: lead.last_name,
+          organization_name: lead.organization?.name,
+          domain: lead.organization?.website_url,
+          linkedin_url: lead.linkedin_url,
+          reveal_personal_emails: true,
+          reveal_phone_number: true
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Api-Key': apolloApiKey
+          }
+        }
+      )
+
+      const person = response.data.person
+
+      if (person.email && person.email_confidence_score && person.email_confidence_score > 80) {
+        totalConfidence += person.email_confidence_score
+
+        enrichedLeads.push({
+          id: person.id,
+          name: person.name,
+          first_name: person.first_name,
+          last_name: person.last_name,
+          email: person.email,
+          email_confidence: person.email_confidence_score,
+          phone: person.phone_numbers?.[0]?.sanitized_number,
+          mobile_phone: person.mobile_phone,
+          corporate_phone: person.corporate_phone,
+          title: person.title,
+          headline: person.headline,
+          linkedin_url: person.linkedin_url,
+          company: person.organization?.name,
+          company_website: person.organization?.website_url,
+          industry: person.organization?.industry,
+          employee_count: person.organization?.estimated_num_employees,
+          annual_revenue: person.organization?.annual_revenue,
+          city: person.organization?.city,
+          state: person.organization?.state,
+          country: person.organization?.country,
+          seniority: person.seniority,
+          departments: person.departments
+        })
+      } else {
+        failedLeads.push(`${lead.first_name} ${lead.last_name} (low email confidence or no email)`)
+      }
+
+      // Rate limiting: Sleep 100ms between requests
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+    } catch (error: any) {
+      console.error(`Enrichment failed for ${lead.first_name} ${lead.last_name}:`, error.response?.data || error.message)
+      failedLeads.push(`${lead.first_name} ${lead.last_name} (API error)`)
+    }
+  }
+
+  const avgConfidence = enrichedLeads.length > 0 ? totalConfidence / enrichedLeads.length : 0
+
+  return NextResponse.json({
+    success: true,
+    leads: enrichedLeads,
+    stats: {
+      total: leads.length,
+      enriched: enrichedLeads.length,
+      with_email: enrichedLeads.length,
+      with_phone: enrichedLeads.filter(l => l.phone).length,
+      avg_confidence: Math.round(avgConfidence * 10) / 10,
+      failed: failedLeads.length,
+      bulk_api_used: false,
+      fallback_used: true
+    },
+    failedLeads: failedLeads.length > 0 ? failedLeads : undefined
+  })
 }
 

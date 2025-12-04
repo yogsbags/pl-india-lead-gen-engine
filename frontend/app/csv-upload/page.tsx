@@ -110,7 +110,7 @@ export default function CSVUploadPage() {
     }
   }
 
-  // Enrich all leads via Apollo API
+  // Enrich all leads via Apollo API (BULK OPTIMIZED)
   const handleEnrichLeads = async () => {
     if (parsedLeads.length === 0) {
       alert('No leads to enrich')
@@ -119,52 +119,83 @@ export default function CSVUploadPage() {
 
     setIsEnriching(true)
     setEnrichmentProgress(0)
-    const enriched: EnrichedLead[] = []
 
-    for (let i = 0; i < parsedLeads.length; i++) {
-      const lead = parsedLeads[i]
+    try {
+      // Send all leads in a single batch request for bulk enrichment
+      const response = await fetch('/api/apollo/enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leads: parsedLeads })
+      })
 
-      try {
-        const response = await fetch('/api/apollo/enrich', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ leads: [lead] })
-        })
+      setEnrichmentProgress(50) // Halfway through processing
 
-        const data = await response.json()
+      const data = await response.json()
 
-        if (data.success && data.leads && data.leads.length > 0) {
+      if (!data.success) {
+        throw new Error(data.error || 'Enrichment failed')
+      }
+
+      // Build enriched leads array with success/failure status
+      const enrichedFromApi = data.leads || []
+      const failedFromApi = new Set(data.failedLeads || [])
+
+      const enriched: EnrichedLead[] = []
+
+      // Match enriched leads back to original parsed leads
+      for (let i = 0; i < parsedLeads.length; i++) {
+        const originalLead = parsedLeads[i]
+        const leadName = `${originalLead.first_name} ${originalLead.last_name}`
+
+        // Find matching enriched lead
+        const enrichedLead = enrichedFromApi.find(
+          (e: any) =>
+            e.first_name === originalLead.first_name &&
+            e.last_name === originalLead.last_name
+        )
+
+        if (enrichedLead) {
           enriched.push({
-            ...data.leads[0],
+            ...enrichedLead,
             enrichment_status: 'success'
           })
         } else {
+          // Check if this lead was marked as failed
+          const failureReason = Array.from(failedFromApi).find((f: any) =>
+            f.includes(leadName)
+          ) as string | undefined
+
           enriched.push({
-            ...lead,
+            ...originalLead,
             id: `csv-${i}`,
             enrichment_status: 'failed',
-            enrichment_error: data.error || 'No data returned'
+            enrichment_error: failureReason || 'No match found'
           })
         }
-
-      } catch (error: any) {
-        console.error('Enrichment error for lead:', lead, error)
-        enriched.push({
-          ...lead,
-          id: `csv-${i}`,
-          enrichment_status: 'failed',
-          enrichment_error: error.message
-        })
       }
 
-      setEnrichmentProgress(Math.round(((i + 1) / parsedLeads.length) * 100))
+      setEnrichmentProgress(100)
+      setEnrichedLeads(enriched)
+      setIsEnriching(false)
+
+      const successCount = enriched.filter(l => l.enrichment_status === 'success').length
+
+      alert(
+        `✅ Bulk enrichment complete!\n\n` +
+        `${successCount}/${enriched.length} leads enriched successfully.\n\n` +
+        `📊 Stats:\n` +
+        `• Total: ${data.stats?.total || 0}\n` +
+        `• With Email: ${data.stats?.with_email || 0}\n` +
+        `• With Phone: ${data.stats?.with_phone || 0}\n` +
+        `• Avg Confidence: ${data.stats?.avg_confidence || 0}%\n` +
+        `• Bulk API: ${data.stats?.bulk_api_used ? 'Yes ⚡' : 'No'}`
+      )
+
+    } catch (error: any) {
+      console.error('Bulk enrichment error:', error)
+      setIsEnriching(false)
+      alert(`❌ Bulk enrichment failed: ${error.message}\n\nPlease try again or contact support.`)
     }
-
-    setEnrichedLeads(enriched)
-    setIsEnriching(false)
-
-    const successCount = enriched.filter(l => l.enrichment_status === 'success').length
-    alert(`✅ Enrichment complete!\n\n${successCount}/${enriched.length} leads enriched successfully.`)
   }
 
   // Download enriched leads as CSV
