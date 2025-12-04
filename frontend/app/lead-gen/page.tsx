@@ -29,6 +29,84 @@ interface WorkflowState {
   metrics?: CampaignMetrics[]
 }
 
+// ICP Scoring based on segment-specific criteria (0-100 scale)
+function calculateICPScore(lead: any, segment: string): number {
+  let score = 0
+
+  // Base score from job title seniority (0-25 points)
+  const seniorityScore = getSeniorityScore(lead.title, lead.seniority)
+  score += seniorityScore
+
+  // Company size score (0-20 points)
+  const companySizeScore = getCompanySizeScore(lead.employee_count)
+  score += companySizeScore
+
+  // Location tier (0-15 points)
+  const locationScore = getLocationScore(lead.city)
+  score += locationScore
+
+  // Industry relevance (0-15 points)
+  const industryScore = getIndustryScore(lead.industry, segment)
+  score += industryScore
+
+  // Email confidence bonus (0-15 points)
+  const emailScore = Math.min((lead.email_confidence || 0) * 0.15, 15)
+  score += emailScore
+
+  // Phone availability bonus (0-10 points)
+  if (lead.phone) score += 10
+
+  return Math.min(Math.round(score), 100)
+}
+
+function getSeniorityScore(title?: string, seniority?: string): number {
+  if (!title) return 0
+  const titleLower = title.toLowerCase()
+
+  // C-level: 25 points
+  if (/(ceo|cto|cfo|coo|founder|chairman|president|managing director)/i.test(titleLower)) return 25
+  // VP/Director: 20 points
+  if (/(vp|vice president|director)/i.test(titleLower)) return 20
+  // Senior/Head: 15 points
+  if (/(senior|head|principal)/i.test(titleLower)) return 15
+  // Manager: 10 points
+  if (/(manager|lead)/i.test(titleLower)) return 10
+  // Others: 5 points
+  return 5
+}
+
+function getCompanySizeScore(employeeCount?: number): number {
+  if (!employeeCount) return 5
+  if (employeeCount >= 1000) return 20
+  if (employeeCount >= 500) return 18
+  if (employeeCount >= 200) return 15
+  if (employeeCount >= 50) return 12
+  if (employeeCount >= 10) return 8
+  return 5
+}
+
+function getLocationScore(city?: string): number {
+  if (!city) return 5
+  const cityLower = city.toLowerCase()
+  // Tier 1 cities: 15 points
+  if (/(mumbai|delhi|bangalore|bengaluru|ncr|gurgaon|noida)/i.test(cityLower)) return 15
+  // Tier 2 cities: 10 points
+  if (/(pune|hyderabad|chennai|kolkata|ahmedabad)/i.test(cityLower)) return 10
+  // Others: 5 points
+  return 5
+}
+
+function getIndustryScore(industry?: string, segment?: string): number {
+  if (!industry) return 5
+  const industryLower = industry.toLowerCase()
+
+  // High-value industries for financial services
+  if (/(financial services|banking|investment|wealth|asset management|insurance)/i.test(industryLower)) return 15
+  if (/(technology|software|it services|consulting)/i.test(industryLower)) return 12
+  if (/(healthcare|pharma|manufacturing|real estate)/i.test(industryLower)) return 10
+  return 5
+}
+
 export default function LeadGenPage() {
   const [workflowState, setWorkflowState] = useState<WorkflowState>({
     stage: 'config'
@@ -96,11 +174,11 @@ export default function LeadGenPage() {
 
       setProgressPercentage(60)
 
-      // Stage 4: ICP Scoring (simulate for now)
+      // Stage 4: ICP Scoring - All leads start as COLD, score based on ICP criteria
       const scoredLeads = enrichData.leads.map((lead: any) => ({
         ...lead,
-        icp_score: Math.floor(Math.random() * 40) + 60, // Random 60-100
-        tier: Math.random() > 0.7 ? 'hot' : Math.random() > 0.4 ? 'warm' : 'cold'
+        icp_score: calculateICPScore(lead, workflowState.config?.segment || ''),
+        tier: 'cold' // All leads start as COLD - will progress to warm/hot based on engagement
       }))
 
       setWorkflowState(prev => ({
