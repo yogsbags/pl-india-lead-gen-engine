@@ -317,7 +317,7 @@ export default function PersonSearchPage() {
             </p>
             <div className="flex flex-col gap-2 text-left max-w-md mx-auto text-slate-300">
               <p>✓ Search by name, title, company, or location</p>
-              <p>✓ Get verified email addresses (>80% confidence)</p>
+              <p>✓ Get verified email addresses ({'>'}80% confidence)</p>
               <p>✓ Enrich with phone numbers and LinkedIn profiles</p>
               <p>✓ Add to campaigns or download as CSV</p>
             </div>

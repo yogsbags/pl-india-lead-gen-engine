@@ -409,7 +409,7 @@ export default function CSVUploadPage() {
             </p>
             <div className="flex flex-col gap-2 text-left max-w-md mx-auto text-slate-300">
               <p>✓ Upload CSV with name, email, company, title columns</p>
-              <p>✓ Enrich each lead with verified email (>80% confidence)</p>
+              <p>✓ Enrich each lead with verified email ({'>'}80% confidence)</p>
               <p>✓ Add phone numbers and LinkedIn profiles</p>
               <p>✓ Download enriched CSV or add to campaigns</p>
             </div>
