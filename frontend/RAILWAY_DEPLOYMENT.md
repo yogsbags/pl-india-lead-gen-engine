@@ -19,11 +19,12 @@ This guide explains how to deploy the PL Capital Lead Generation frontend to Rai
 
 ### 2. Configure Build Settings
 
-Railway should automatically detect the configuration from `nixpacks.toml`:
+Railway will automatically detect the configuration from `railway.toml`:
 
-- **Build Command**: `npm run build`
-- **Start Command**: `npm start`
-- **Install Command**: `npm ci`
+- **Build Command**: `npm run build` (auto-detected)
+- **Start Command**: `npm start` (from railway.toml)
+- **Install Command**: `npm ci` (auto-detected)
+- **Port**: Railway auto-assigns PORT environment variable (typically 8080)
 
 ### 3. Set Environment Variables
 
@@ -48,8 +49,8 @@ HEYGEN_VOICE_ID_SIDDHARTH=your_voice_id
 
 **DO NOT SET:**
 ```
-PORT (Railway sets this automatically)
-NODE_ENV (Railway sets this automatically)
+PORT (Railway auto-assigns this - typically 8080)
+NODE_ENV (Railway sets this to "production" automatically)
 ```
 
 ### 4. Deploy
@@ -104,13 +105,14 @@ npm run build
 **Possible Causes**:
 1. Missing environment variables (check Railway logs)
 2. Missing `.next` build directory (ensure build step ran)
-3. Port configuration issue (check nixpacks.toml)
+3. Port configuration issue (Railway should auto-assign PORT)
 
 **Solution**:
 1. Check Railway logs for specific error
 2. Verify all REQUIRED env vars are set
 3. Ensure `npm run build` completed successfully
-4. Check that nixpacks.toml exists in repository
+4. Check that `railway.toml` exists in repository
+5. Verify `package.json` start script uses `$PORT` variable
 
 ### API Routes Fail
 
@@ -153,19 +155,15 @@ npm run build
 
 The following files control Railway deployment:
 
-### `nixpacks.toml`
+### `railway.toml`
 ```toml
-[phases.setup]
-nixPkgs = ["nodejs-18_x"]
+[build]
+builder = "nixpacks"
 
-[phases.install]
-cmds = ["npm ci"]
-
-[phases.build]
-cmds = ["npm run build"]
-
-[start]
-cmd = "npm start"
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "on-failure"
+restartPolicyMaxRetries = 10
 ```
 
 ### `package.json` (relevant scripts)
@@ -173,10 +171,11 @@ cmd = "npm start"
 {
   "scripts": {
     "build": "next build",
-    "start": "next start"
+    "start": "next start -p $PORT"
   }
 }
 ```
+**Note**: `$PORT` is automatically set by Railway (typically 8080)
 
 ## Environment-Specific Configuration
 
@@ -188,9 +187,9 @@ npm run dev # Runs on http://localhost:3005
 ### Production (Railway)
 ```bash
 # Railway automatically runs:
-npm ci
-npm run build
-npm start # Listens on $PORT (set by Railway)
+npm ci                    # Install dependencies
+npm run build             # Build Next.js app
+npm start                 # Start server on $PORT (Railway sets to 8080)
 ```
 
 ## Security Best Practices
