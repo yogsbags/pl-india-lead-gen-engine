@@ -108,13 +108,17 @@ export async function POST(request: NextRequest) {
       per_page: leadCount
     }
 
-    console.log('Apollo API Request URL: https://api.apollo.io/v1/Mixed_people/api_search')
+    // Apollo People Search API endpoint
+    // Note: Apollo API endpoint format - using lowercase to match companies endpoint pattern
+    const endpoint = 'https://api.apollo.io/v1/mixed_people/search'
+
+    console.log('Apollo API Request URL:', endpoint)
     console.log('Apollo API Request Payload:', JSON.stringify(requestPayload, null, 2))
 
     let response
     try {
       response = await axios.post<ApolloSearchResponse>(
-        'https://api.apollo.io/v1/Mixed_people/api_search',
+        endpoint,
         requestPayload,
         {
           headers: {
@@ -133,7 +137,31 @@ export async function POST(request: NextRequest) {
           statusText: response.statusText,
           data: response.data
         })
-        throw new Error(`Apollo API returned ${response.status}: ${JSON.stringify(response.data || response.statusText)}`)
+        
+        // If 404, try the alternative endpoint format
+        if (response.status === 404) {
+          console.log('Trying alternative endpoint format: /Mixed_people/api_search')
+          const altResponse = await axios.post<ApolloSearchResponse>(
+            'https://api.apollo.io/v1/Mixed_people/api_search',
+            requestPayload,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache',
+                'X-Api-Key': apolloApiKey
+              },
+              validateStatus: () => true
+            }
+          )
+          
+          if (altResponse.status === 200) {
+            response = altResponse
+          } else {
+            throw new Error(`Apollo API returned ${altResponse.status}: ${JSON.stringify(altResponse.data || altResponse.statusText)}`)
+          }
+        } else {
+          throw new Error(`Apollo API returned ${response.status}: ${JSON.stringify(response.data || response.statusText)}`)
+        }
       }
     } catch (apiError: any) {
       // If axios throws, it's a network/connection error
