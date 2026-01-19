@@ -101,21 +101,52 @@ export async function POST(request: NextRequest) {
       searchCriteria
     }, null, 2))
 
-    // Call NEW Apollo People Search API (returns shallow profiles - FREE)
-    const response = await axios.post<ApolloSearchResponse>(
-      'https://api.apollo.io/v1/Mixed_people/api_search',
-      {
-        ...searchCriteria,
-        page: 1,
-        per_page: leadCount
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-Key': apolloApiKey
+    // Call Apollo People Search API (returns shallow profiles - FREE)
+    const requestPayload = {
+      ...searchCriteria,
+      page: 1,
+      per_page: leadCount
+    }
+
+    console.log('Apollo API Request URL: https://api.apollo.io/v1/Mixed_people/api_search')
+    console.log('Apollo API Request Payload:', JSON.stringify(requestPayload, null, 2))
+
+    let response
+    try {
+      response = await axios.post<ApolloSearchResponse>(
+        'https://api.apollo.io/v1/Mixed_people/api_search',
+        requestPayload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'X-Api-Key': apolloApiKey
+          },
+          validateStatus: () => true // Don't throw on HTTP errors
         }
+      )
+
+      // Check for API errors
+      if (response.status !== 200) {
+        console.error('Apollo API Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          data: response.data
+        })
+        throw new Error(`Apollo API returned ${response.status}: ${JSON.stringify(response.data || response.statusText)}`)
       }
-    )
+    } catch (apiError: any) {
+      // If axios throws, it's a network/connection error
+      if (apiError.response) {
+        console.error('Apollo API Error:', {
+          status: apiError.response.status,
+          statusText: apiError.response.statusText,
+          data: apiError.response.data
+        })
+        throw new Error(`Apollo API error (${apiError.response.status}): ${JSON.stringify(apiError.response.data || apiError.response.statusText)}`)
+      }
+      throw apiError
+    }
 
     console.log('Apollo Search Response:', JSON.stringify({
       peopleCount: response.data.people?.length || 0,
@@ -135,14 +166,42 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error('Apollo scraping error:', error.response?.data || error.message)
+    console.error('Apollo scraping error:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      stack: error.stack
+    })
+
+    // Provide more helpful error messages
+    let errorMessage = error.message || 'Failed to scrape leads'
+    let statusCode = 500
+
+    if (error.response) {
+      statusCode = error.response.status || 500
+      if (error.response.data) {
+        if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data
+        } else if (error.response.data.message) {
+          errorMessage = error.response.data.message
+        } else if (error.response.data.error) {
+          errorMessage = error.response.data.error
+        } else {
+          errorMessage = JSON.stringify(error.response.data)
+        }
+      } else {
+        errorMessage = `Apollo API returned ${statusCode}: ${error.response.statusText || 'Unknown error'}`
+      }
+    }
 
     return NextResponse.json(
       {
         success: false,
-        error: error.response?.data?.message || error.message || 'Failed to scrape leads'
+        error: errorMessage,
+        details: error.response?.data || undefined,
+        statusCode: statusCode
       },
-      { status: 500 }
+      { status: statusCode >= 400 && statusCode < 600 ? statusCode : 500 }
     )
   }
 }
