@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs/promises'
 import path from 'path'
+import { getMoengageClientInstance } from '../client'
+
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 interface MoEngageEvent {
   event_name: string
@@ -269,12 +273,7 @@ async function triggerCampaign(
   try {
     console.log(`🎯 Triggering ${tier.toUpperCase()} campaign for ${email}`)
 
-    // Load MoEngage client
-    const automationEnginePath = path.resolve(process.cwd(), '..', 'automation-engine')
-    const moengageClientPath = path.join(automationEnginePath, 'services', 'moengage-client.js')
-    const { getMoengageClient } = await import(`file://${moengageClientPath}`)
-
-    const client = getMoengageClient()
+    const client = await getMoengageClientInstance()
 
     // Get campaign template for tier
     const campaignName = tier === 'warm'

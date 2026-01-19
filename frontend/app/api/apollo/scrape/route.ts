@@ -52,10 +52,16 @@ interface ApolloSearchResponse {
 }
 
 /**
- * Apollo Lead Scraping API Route
+ * Apollo Lead Scraping API Route (Updated for January 15, 2026 Migration)
  *
  * Fetches leads from Apollo.io using lookalike profile-based search
  * Supports all 8 segments defined in config/segments.js
+ *
+ * NEW WORKFLOW (Jan 15, 2026+):
+ * - Returns shallow contact profiles (preview data without full enrichment)
+ * - Email/phone numbers not included in shallow profiles (use enrichment endpoint separately)
+ * - Shallow search is FREE (no credit cost)
+ * - To get full contact data, use /api/apollo/enrich endpoint with selected lead IDs
  */
 export async function POST(request: NextRequest) {
   try {
@@ -89,9 +95,15 @@ export async function POST(request: NextRequest) {
     // Get segment-specific search criteria
     const searchCriteria = getSegmentCriteria(segment)
 
-    // Call Apollo People Search API
+    console.log('Apollo Search Request (Shallow):', JSON.stringify({
+      segment,
+      leadCount,
+      searchCriteria
+    }, null, 2))
+
+    // Call NEW Apollo People Search API (returns shallow profiles - FREE)
     const response = await axios.post<ApolloSearchResponse>(
-      'https://api.apollo.io/v1/mixed_people/search',
+      'https://api.apollo.io/v1/Mixed_people/api_search',
       {
         ...searchCriteria,
         page: 1,
@@ -105,6 +117,11 @@ export async function POST(request: NextRequest) {
       }
     )
 
+    console.log('Apollo Search Response:', JSON.stringify({
+      peopleCount: response.data.people?.length || 0,
+      pagination: response.data.pagination
+    }, null, 2))
+
     const leads = response.data.people || []
 
     return NextResponse.json({
@@ -112,11 +129,14 @@ export async function POST(request: NextRequest) {
       segment,
       leads,
       count: leads.length,
-      pagination: response.data.pagination
+      pagination: response.data.pagination,
+      enriched: false,
+      message: 'Shallow profiles returned (no credit cost). Use /api/apollo/enrich to get full contact data.'
     })
 
   } catch (error: any) {
     console.error('Apollo scraping error:', error.response?.data || error.message)
+
     return NextResponse.json(
       {
         success: false,
@@ -203,10 +223,16 @@ function getSegmentCriteria(segment: string): Record<string, any> {
   if (segment === 'mass-affluent') {
     return {
       ...baseIndia,
-      person_titles: ['Manager', 'Senior Manager', 'Assistant Vice President', 'Professional'],
-      organization_num_employees_ranges: ['11-50', '51-200', '201-500'],
-      q_keywords: 'manager OR professional OR consultant',
-      person_seniority: ['manager', 'senior']
+      person_titles: [
+        'Vice President',
+        'Director',
+        'Senior Manager',
+        'Head',
+        'General Manager',
+        'Assistant Vice President'
+      ],
+      // Keep to mid-large companies to avoid small-firm noise; titles-only works better than keyword filters
+      organization_num_employees_ranges: ['201-500', '501-1000', '1001-5000', '5001-10000', '10001+']
     }
   }
 
@@ -216,4 +242,3 @@ function getSegmentCriteria(segment: string): Record<string, any> {
     q_keywords: 'executive OR manager OR professional'
   }
 }
-

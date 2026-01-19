@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import { getMoengageClientInstance } from '../client'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 type MoengageTrackPayload = {
   type: 'event' | 'customer'
@@ -20,12 +19,7 @@ export async function POST(request: NextRequest) {
   try {
     const payload = await request.json() as MoengageTrackPayload
 
-    // Import MoEngage client from automation-engine (relative to frontend)
-    const automationEnginePath = path.resolve(__dirname, '../../../../automation-engine')
-    const moengageClientPath = path.join(automationEnginePath, 'services', 'moengage-client.js')
-    const { getMoengageClient } = await import(`file://${moengageClientPath}`)
-
-    const client = getMoengageClient()
+    const client = await getMoengageClientInstance()
 
     const result = await client.track(payload)
 
@@ -38,4 +32,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

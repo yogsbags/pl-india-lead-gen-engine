@@ -136,7 +136,7 @@ function parseSearchQuery(query: string): Record<string, any> {
 }
 
 /**
- * Apollo Person Search API Route
+ * Apollo Person Search API Route (Updated for January 15, 2026 Migration)
  *
  * Searches for people on Apollo using a query string (name, title, company, etc.)
  * Returns up to 25 search results for manual selection
@@ -145,6 +145,12 @@ function parseSearchQuery(query: string): Record<string, any> {
  * - "Rajesh Sharma CEO Mumbai" → name: Rajesh Sharma, title: CEO, location: Mumbai
  * - "Founder Bangalore" → title: Founder, location: Bangalore
  * - "CFO at Reliance" → title: CFO, company: Reliance
+ *
+ * NEW WORKFLOW (Jan 15, 2026+):
+ * - Returns shallow contact profiles (preview data without full enrichment)
+ * - Email/phone numbers NOT included in shallow profiles (null by default)
+ * - Shallow search is FREE (no credit cost)
+ * - To get full contact data, use /api/apollo/enrich endpoint with selected person IDs
  */
 export async function POST(request: NextRequest) {
   try {
@@ -171,9 +177,9 @@ export async function POST(request: NextRequest) {
     // Parse query to extract structured search parameters
     const searchParams = parseSearchQuery(query)
 
-    // Call Apollo People Search API with parsed parameters
+    // Call NEW Apollo People Search API (returns shallow profiles - FREE)
     const response = await axios.post<ApolloSearchResponse>(
-      'https://api.apollo.io/v1/mixed_people/search',
+      'https://api.apollo.io/v1/Mixed_people/api_search',
       {
         ...searchParams,
         page: 1,
@@ -190,6 +196,7 @@ export async function POST(request: NextRequest) {
     const people = response.data.people || []
 
     // Transform to SearchResult format expected by frontend
+    // NOTE: email and phone will be null in shallow profiles (not enriched)
     const searchResults = people.map(person => ({
       id: person.id,
       name: person.name,
@@ -197,8 +204,8 @@ export async function POST(request: NextRequest) {
       last_name: person.last_name,
       title: person.title || '',
       company: person.organization?.name || '',
-      email: person.email,
-      phone: person.phone,
+      email: person.email || null, // Will be null in shallow profiles
+      phone: person.phone || null, // Will be null in shallow profiles
       linkedin_url: person.linkedin_url,
       city: person.city,
       state: person.state,
@@ -211,7 +218,9 @@ export async function POST(request: NextRequest) {
       success: true,
       people: searchResults,
       count: searchResults.length,
-      pagination: response.data.pagination
+      pagination: response.data.pagination,
+      enriched: false,
+      message: 'Shallow profiles returned (no credit cost). Use /api/apollo/enrich to get email/phone data.'
     })
 
   } catch (error: any) {

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import { getMoengageClientInstance } from '../client'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 interface EnrichedLead {
   id: string
@@ -43,11 +42,7 @@ interface UploadLeadsRequest {
 export async function GET(request: NextRequest) {
   try {
     // Get segments from MoEngage
-    const automationEnginePath = path.resolve(__dirname, '../../../../../automation-engine')
-    const moengageClientPath = path.join(automationEnginePath, 'services', 'moengage-client.js')
-    const { getMoengageClient } = await import(`file://${moengageClientPath}`)
-
-    const client = getMoengageClient()
+    const client = await getMoengageClientInstance()
     const segments = await client.listSegments()
 
     return NextResponse.json({
@@ -86,11 +81,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create segment in MoEngage
-    const automationEnginePath = path.resolve(__dirname, '../../../../../automation-engine')
-    const moengageClientPath = path.join(automationEnginePath, 'services', 'moengage-client.js')
-    const { getMoengageClient } = await import(`file://${moengageClientPath}`)
-
-    const client = getMoengageClient()
+    const client = await getMoengageClientInstance()
 
     // Step 1: Create segment
     const segment = await client.createSegment({
@@ -166,11 +157,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Upload leads to existing segment
-    const automationEnginePath = path.resolve(__dirname, '../../../../../automation-engine')
-    const moengageClientPath = path.join(automationEnginePath, 'services', 'moengage-client.js')
-    const { getMoengageClient } = await import(`file://${moengageClientPath}`)
-
-    const client = getMoengageClient()
+    const client = await getMoengageClientInstance()
 
     const moengageUsers = leads.map(lead => ({
       email: lead.email,
@@ -221,11 +208,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete segment from MoEngage
-    const automationEnginePath = path.resolve(__dirname, '../../../../../automation-engine')
-    const moengageClientPath = path.join(automationEnginePath, 'services', 'moengage-client.js')
-    const { getMoengageClient } = await import(`file://${moengageClientPath}`)
-
-    const client = getMoengageClient()
+    const client = await getMoengageClientInstance()
     await client.deleteSegment(segmentId)
 
     return NextResponse.json({

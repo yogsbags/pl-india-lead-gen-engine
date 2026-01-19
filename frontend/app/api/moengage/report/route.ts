@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import { getMoengageClientInstance } from '../client'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,12 +12,7 @@ export async function GET(request: NextRequest) {
     const catalogId = searchParams.get('catalogId')
     const reportId = searchParams.get('reportId')
 
-    // Import MoEngage client from automation-engine (relative to frontend)
-    const automationEnginePath = path.resolve(__dirname, '../../../../automation-engine')
-    const moengageClientPath = path.join(automationEnginePath, 'services', 'moengage-client.js')
-    const { getMoengageClient } = await import(`file://${moengageClientPath}`)
-
-    const client = getMoengageClient()
+    const client = await getMoengageClientInstance()
 
     let result
 
@@ -81,4 +75,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-

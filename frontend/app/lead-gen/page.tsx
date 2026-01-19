@@ -107,79 +107,160 @@ function getIndustryScore(industry?: string, segment?: string): number {
   return 5
 }
 
+interface ActivityLog {
+  timestamp: string
+  type: 'info' | 'success' | 'error' | 'api'
+  message: string
+  details?: any
+}
+
 export default function LeadGenPage() {
   const [workflowState, setWorkflowState] = useState<WorkflowState>({
     stage: 'config'
   })
+  const [executionMode, setExecutionMode] = useState<'full' | 'staged'>('full')
   const [isProcessing, setIsProcessing] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string>('')
   const [progressPercentage, setProgressPercentage] = useState<number>(0)
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([])
+
+  const addLog = (type: ActivityLog['type'], message: string, details?: any) => {
+    setActivityLogs(prev => [...prev, {
+      timestamp: new Date().toLocaleTimeString(),
+      type,
+      message,
+      details
+    }])
+  }
 
   // Stage 1-2: Execute lead scraping
   const handleExecuteWorkflow = async (config: LeadGenConfig) => {
+    setWorkflowState(prev => ({ ...prev, config }))
+    addLog('info', `🚀 Starting ${executionMode === 'full' ? 'Full' : 'Stage-by-Stage'} Workflow`, {
+      segment: config.segment,
+      leadCount: config.leadCount,
+      outreachModes: config.outreachModes
+    })
+
+    if (executionMode === 'full') {
+      // Full workflow: scraping → enrichment → scoring → preview
+      await handleScraping(config)
+    } else {
+      // Stage-by-stage: just save config and let user run stages manually
+      setWorkflowState({ stage: 'config', config })
+      addLog('success', '✅ Configuration saved. Ready to run stages manually.')
+    }
+  }
+
+  // Individual stage handlers for stage-by-stage execution
+  const handleScraping = async (config?: LeadGenConfig) => {
+    const currentConfig = config || workflowState.config
+    if (!currentConfig) {
+      addLog('error', '❌ No configuration found. Please configure workflow first.')
+      alert('Please configure workflow settings first')
+      return
+    }
+
     setIsProcessing(true)
-    setWorkflowState({ stage: 'scraping', config })
+    setWorkflowState(prev => ({ ...prev, stage: 'scraping', config: currentConfig }))
     setStatusMessage('🔍 Scraping leads from Apollo...')
     setProgressPercentage(10)
+    addLog('info', `🔍 Stage 2: Scraping ${currentConfig.leadCount} leads for ${currentConfig.segment}`)
 
     try {
-      // Call Apollo scraping API
+      addLog('api', '📡 POST /api/apollo/scrape', {
+        segment: currentConfig.segment,
+        leadCount: currentConfig.leadCount
+      })
+
       const scrapeResponse = await fetch('/api/apollo/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          segment: config.segment,
-          leadCount: config.leadCount
+          segment: currentConfig.segment,
+          leadCount: currentConfig.leadCount
         })
       })
 
       const scrapeData = await scrapeResponse.json()
+      addLog('api', `📥 Response: ${scrapeResponse.status} ${scrapeResponse.statusText}`, {
+        success: scrapeData.success,
+        leadsCount: scrapeData.leads?.length
+      })
+
       if (!scrapeData.success) {
         throw new Error(scrapeData.error || 'Scraping failed')
       }
 
+      addLog('success', `✅ Scraped ${scrapeData.leads.length} leads successfully`)
       setProgressPercentage(30)
       setWorkflowState(prev => ({ ...prev, scrapedLeads: scrapeData.leads }))
 
-      // Stage 3: Enrichment
-      await handleEnrichment(scrapeData.leads)
+      // In full mode, continue to enrichment
+      if (executionMode === 'full') {
+        await handleEnrichment(scrapeData.leads)
+      } else {
+        setStatusMessage('✅ Scraping complete!')
+        setIsProcessing(false)
+      }
 
     } catch (error: any) {
-      console.error('Workflow error:', error)
+      console.error('Scraping error:', error)
+      addLog('error', `❌ Scraping failed: ${error.message}`, error)
       alert(`Error: ${error.message}`)
       setIsProcessing(false)
-      setWorkflowState({ stage: 'config' })
+      setWorkflowState(prev => ({ ...prev, stage: 'config' }))
     }
   }
 
   // Stage 3-4: Enrich leads and score
-  const handleEnrichment = async (leads: any[]) => {
+  const handleEnrichment = async (leads?: any[]) => {
+    const leadsToEnrich = leads || workflowState.scrapedLeads
+    if (!leadsToEnrich || leadsToEnrich.length === 0) {
+      addLog('error', '❌ No leads available for enrichment')
+      alert('No scraped leads available. Please run scraping first.')
+      return
+    }
+
+    setIsProcessing(true)
     setWorkflowState(prev => ({ ...prev, stage: 'enrichment' }))
     setStatusMessage('💎 Enriching leads with email and phone data...')
     setProgressPercentage(40)
+    addLog('info', `💎 Stage 3: Enriching ${leadsToEnrich.length} leads`)
 
     try {
+      addLog('api', '📡 POST /api/apollo/enrich', { leadsCount: leadsToEnrich.length })
+
       const enrichResponse = await fetch('/api/apollo/enrich', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          leads
+          leads: leadsToEnrich
         })
       })
 
       const enrichData = await enrichResponse.json()
+      addLog('api', `📥 Response: ${enrichResponse.status} ${enrichResponse.statusText}`, {
+        success: enrichData.success,
+        enrichedCount: enrichData.leads?.length
+      })
+
       if (!enrichData.success) {
         throw new Error(enrichData.error || 'Enrichment failed')
       }
 
+      addLog('success', `✅ Enriched ${enrichData.leads.length} leads successfully`)
       setProgressPercentage(60)
 
       // Stage 4: ICP Scoring - All leads start as COLD, score based on ICP criteria
+      addLog('info', '📊 Stage 4: Calculating ICP scores')
       const scoredLeads = enrichData.leads.map((lead: any) => ({
         ...lead,
         icp_score: calculateICPScore(lead, workflowState.config?.segment || ''),
         tier: 'cold' // All leads start as COLD - will progress to warm/hot based on engagement
       }))
+
+      addLog('success', `✅ Scored ${scoredLeads.length} leads (avg score: ${Math.round(scoredLeads.reduce((sum: number, l: any) => sum + (l.icp_score || 0), 0) / scoredLeads.length)})`)
 
       setWorkflowState(prev => ({
         ...prev,
@@ -192,9 +273,10 @@ export default function LeadGenPage() {
 
     } catch (error: any) {
       console.error('Enrichment error:', error)
+      addLog('error', `❌ Enrichment failed: ${error.message}`, error)
       alert(`Error: ${error.message}`)
       setIsProcessing(false)
-      setWorkflowState({ stage: 'config' })
+      setWorkflowState(prev => ({ ...prev, stage: 'config' }))
     }
   }
 
@@ -445,6 +527,39 @@ export default function LeadGenPage() {
           </p>
         </div>
 
+        {/* Execution Mode Toggle */}
+        <div className="mb-6 bg-slate-800/40 rounded-lg p-4 border border-blue-500/20">
+          <label className="block text-blue-200 font-semibold mb-3">Execution Mode</label>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setExecutionMode('full')}
+              disabled={isProcessing}
+              className={`flex-1 p-3 rounded-lg border-2 transition-all ${
+                executionMode === 'full'
+                  ? 'bg-blue-500 border-blue-400 text-white shadow-lg shadow-blue-500/30'
+                  : 'bg-slate-700/30 border-slate-600/30 text-blue-200 hover:border-blue-500/50'
+              } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <div className="text-2xl mb-1">🚀</div>
+              <div className="font-bold">Full Workflow</div>
+              <div className="text-xs opacity-70">Automatic stage progression</div>
+            </button>
+            <button
+              onClick={() => setExecutionMode('staged')}
+              disabled={isProcessing}
+              className={`flex-1 p-3 rounded-lg border-2 transition-all ${
+                executionMode === 'staged'
+                  ? 'bg-blue-500 border-blue-400 text-white shadow-lg shadow-blue-500/30'
+                  : 'bg-slate-700/30 border-slate-600/30 text-blue-200 hover:border-blue-500/50'
+              } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <div className="text-2xl mb-1">🎯</div>
+              <div className="font-bold">Stage-by-Stage</div>
+              <div className="text-xs opacity-70">Run each stage manually</div>
+            </button>
+          </div>
+        </div>
+
         {/* Progress Bar */}
         {progressPercentage > 0 && (
           <div className="mb-8 bg-slate-800/40 rounded-lg p-4 border border-blue-500/20">
@@ -461,105 +576,332 @@ export default function LeadGenPage() {
           </div>
         )}
 
-        {/* Stage Indicator */}
-        <div className="mb-8 flex flex-wrap gap-2">
-          {[
-            { key: 'config', label: '⚙️ Config' },
-            { key: 'scraping', label: '🔍 Scraping' },
-            { key: 'enrichment', label: '💎 Enrichment' },
-            { key: 'scoring', label: '📊 Scoring' },
-            { key: 'preview_leads', label: '👀 Preview' },
-            { key: 'script_generation', label: '🤖 AI Scripts' },
-            { key: 'campaign_preview', label: '✉️ Review' },
-            { key: 'test_campaign', label: '🧪 Test' },
-            { key: 'production_campaign', label: '🚀 Publish' },
-            { key: 'analytics', label: '📈 Analytics' }
-          ].map(({ key, label }) => (
-            <span
-              key={key}
-              className={`
-                px-4 py-2 rounded-lg font-semibold transition-all duration-200
-                ${workflowState.stage === key
-                  ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-                  : 'bg-slate-800/40 text-blue-300/60'
-                }
-              `}
-            >
-              {label}
-            </span>
-          ))}
-        </div>
+        {/* Activity Log */}
+        {activityLogs.length > 0 && (
+          <div className="mb-8 bg-slate-800/40 rounded-lg border border-blue-500/20 overflow-hidden">
+            <div className="p-4 bg-slate-900/50 border-b border-blue-500/20 flex justify-between items-center">
+              <h3 className="text-white font-bold flex items-center gap-2">
+                <span className="text-2xl">📋</span>
+                Activity Log
+              </h3>
+              <button
+                onClick={() => setActivityLogs([])}
+                className="px-3 py-1 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded transition-all"
+              >
+                Clear
+              </button>
+            </div>
+            <div className="max-h-96 overflow-y-auto p-4 space-y-2">
+              {activityLogs.map((log, index) => (
+                <div
+                  key={index}
+                  className={`p-3 rounded-lg border-l-4 ${
+                    log.type === 'success' ? 'bg-green-900/20 border-green-500' :
+                    log.type === 'error' ? 'bg-red-900/20 border-red-500' :
+                    log.type === 'api' ? 'bg-blue-900/20 border-blue-500' :
+                    'bg-slate-700/20 border-slate-500'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-xs text-blue-300/50 font-mono whitespace-nowrap">
+                      {log.timestamp}
+                    </span>
+                    <div className="flex-1">
+                      <div className="text-white text-sm">{log.message}</div>
+                      {log.details && (
+                        <details className="mt-2">
+                          <summary className="text-xs text-blue-300/70 cursor-pointer hover:text-blue-300">
+                            View Details
+                          </summary>
+                          <pre className="mt-2 p-2 bg-slate-900/50 rounded text-xs text-green-300 overflow-x-auto">
+                            {JSON.stringify(log.details, null, 2)}
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-        {/* Workflow Stages */}
-        <div className="space-y-8">
+        {/* Workflow Stages with Inline Content */}
+        <div className="space-y-4">
           {/* Stage 1: Configuration */}
-          {workflowState.stage === 'config' && (
-            <LeadConfigPanel
-              onExecute={handleExecuteWorkflow}
-              isExecuting={isProcessing}
-            />
-          )}
-
-          {/* Stage 4-5: Preview Enriched Leads */}
-          {workflowState.stage === 'preview_leads' && workflowState.enrichedLeads && (
-            <>
-              <EnrichedLeadsTable
-                leads={workflowState.enrichedLeads}
-                onDownloadCSV={handleDownloadCSV}
-                onCreateCampaign={handleCreateCampaign}
-                isLoading={isProcessing}
-              />
-              <div className="flex justify-between">
-                <button
-                  onClick={handleResetWorkflow}
-                  className="px-6 py-3 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-semibold transition-all duration-200"
-                >
-                  ← Start Over
-                </button>
+          <div className="bg-slate-800/20 rounded-xl border-2 border-slate-700/30">
+            <div className="flex items-center gap-3 p-4">
+              <span
+                className={`
+                  flex-1 px-4 py-2 rounded-lg font-semibold transition-all duration-200
+                  ${workflowState.stage === 'config'
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                    : 'bg-slate-800/40 text-blue-300/60'
+                  }
+                `}
+              >
+                ⚙️ Config
+              </span>
+            </div>
+            {workflowState.stage === 'config' && (
+              <div className="p-4 pt-0">
+                <LeadConfigPanel
+                  onExecute={handleExecuteWorkflow}
+                  isExecuting={isProcessing}
+                />
               </div>
-            </>
-          )}
+            )}
+          </div>
 
-          {/* Stage 6-8: Campaign Preview */}
-          {workflowState.stage === 'campaign_preview' && workflowState.scripts && (
-            <>
-              <CampaignPreview
-                scripts={workflowState.scripts}
-                onSendTest={handleSendTest}
-                onPublish={handlePublish}
-                onEdit={handleEditScript}
-                isProcessing={isProcessing}
-              />
-              <div className="flex justify-between">
+          {/* Stage 2: Scraping */}
+          <div className="bg-slate-800/20 rounded-xl border-2 border-slate-700/30">
+            <div className="flex items-center gap-3 p-4">
+              <span
+                className={`
+                  flex-1 px-4 py-2 rounded-lg font-semibold transition-all duration-200
+                  ${workflowState.stage === 'scraping'
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                    : 'bg-slate-800/40 text-blue-300/60'
+                  }
+                `}
+              >
+                🔍 Scraping
+              </span>
+              {executionMode === 'staged' && workflowState.config && (
                 <button
-                  onClick={handleResetWorkflow}
-                  className="px-6 py-3 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-semibold transition-all duration-200"
+                  onClick={() => handleScraping()}
+                  disabled={isProcessing || !workflowState.config}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-green-600"
                 >
-                  ← Start Over
+                  ▶ Run
                 </button>
+              )}
+            </div>
+            {workflowState.stage === 'scraping' && isProcessing && (
+              <div className="p-4 pt-0">
+                <div className="bg-slate-700/30 rounded-lg p-6 text-center">
+                  <div className="text-4xl mb-3 animate-pulse">🔍</div>
+                  <div className="text-blue-200 font-semibold">{statusMessage}</div>
+                </div>
               </div>
-            </>
-          )}
+            )}
+          </div>
+
+          {/* Stage 3: Enrichment */}
+          <div className="bg-slate-800/20 rounded-xl border-2 border-slate-700/30">
+            <div className="flex items-center gap-3 p-4">
+              <span
+                className={`
+                  flex-1 px-4 py-2 rounded-lg font-semibold transition-all duration-200
+                  ${workflowState.stage === 'enrichment'
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                    : 'bg-slate-800/40 text-blue-300/60'
+                  }
+                `}
+              >
+                💎 Enrichment
+              </span>
+              {executionMode === 'staged' && workflowState.scrapedLeads && (
+                <button
+                  onClick={() => handleEnrichment()}
+                  disabled={isProcessing || !workflowState.scrapedLeads}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-green-600"
+                >
+                  ▶ Run
+                </button>
+              )}
+            </div>
+            {workflowState.stage === 'enrichment' && isProcessing && (
+              <div className="p-4 pt-0">
+                <div className="bg-slate-700/30 rounded-lg p-6 text-center">
+                  <div className="text-4xl mb-3 animate-pulse">💎</div>
+                  <div className="text-blue-200 font-semibold">{statusMessage}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Stage 4: Scoring (automatic, no content) */}
+          <div className="bg-slate-800/20 rounded-xl border-2 border-slate-700/30">
+            <div className="flex items-center gap-3 p-4">
+              <span
+                className={`
+                  flex-1 px-4 py-2 rounded-lg font-semibold transition-all duration-200
+                  ${workflowState.stage === 'scoring'
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                    : 'bg-slate-800/40 text-blue-300/60'
+                  }
+                `}
+              >
+                📊 Scoring
+              </span>
+            </div>
+          </div>
+
+          {/* Stage 5: Preview Leads */}
+          <div className="bg-slate-800/20 rounded-xl border-2 border-slate-700/30">
+            <div className="flex items-center gap-3 p-4">
+              <span
+                className={`
+                  flex-1 px-4 py-2 rounded-lg font-semibold transition-all duration-200
+                  ${workflowState.stage === 'preview_leads'
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                    : 'bg-slate-800/40 text-blue-300/60'
+                  }
+                `}
+              >
+                👀 Preview
+              </span>
+            </div>
+            {workflowState.stage === 'preview_leads' && workflowState.enrichedLeads && (
+              <div className="p-4 pt-0">
+                <EnrichedLeadsTable
+                  leads={workflowState.enrichedLeads}
+                  onDownloadCSV={handleDownloadCSV}
+                  onCreateCampaign={handleCreateCampaign}
+                  isLoading={isProcessing}
+                />
+                <div className="flex justify-between mt-4">
+                  <button
+                    onClick={handleResetWorkflow}
+                    className="px-6 py-3 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-semibold transition-all duration-200"
+                  >
+                    ← Start Over
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Stage 6: Script Generation (automatic, no content) */}
+          <div className="bg-slate-800/20 rounded-xl border-2 border-slate-700/30">
+            <div className="flex items-center gap-3 p-4">
+              <span
+                className={`
+                  flex-1 px-4 py-2 rounded-lg font-semibold transition-all duration-200
+                  ${workflowState.stage === 'script_generation'
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                    : 'bg-slate-800/40 text-blue-300/60'
+                  }
+                `}
+              >
+                🤖 AI Scripts
+              </span>
+            </div>
+            {workflowState.stage === 'script_generation' && isProcessing && (
+              <div className="p-4 pt-0">
+                <div className="bg-slate-700/30 rounded-lg p-6 text-center">
+                  <div className="text-4xl mb-3 animate-pulse">🤖</div>
+                  <div className="text-blue-200 font-semibold">{statusMessage}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Stage 7: Campaign Preview */}
+          <div className="bg-slate-800/20 rounded-xl border-2 border-slate-700/30">
+            <div className="flex items-center gap-3 p-4">
+              <span
+                className={`
+                  flex-1 px-4 py-2 rounded-lg font-semibold transition-all duration-200
+                  ${workflowState.stage === 'campaign_preview'
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                    : 'bg-slate-800/40 text-blue-300/60'
+                  }
+                `}
+              >
+                ✉️ Review
+              </span>
+            </div>
+            {workflowState.stage === 'campaign_preview' && workflowState.scripts && (
+              <div className="p-4 pt-0">
+                <CampaignPreview
+                  scripts={workflowState.scripts}
+                  onSendTest={handleSendTest}
+                  onPublish={handlePublish}
+                  onEdit={handleEditScript}
+                  isProcessing={isProcessing}
+                />
+                <div className="flex justify-between mt-4">
+                  <button
+                    onClick={handleResetWorkflow}
+                    className="px-6 py-3 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-semibold transition-all duration-200"
+                  >
+                    ← Start Over
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Stage 8: Test Campaign (no separate content) */}
+          <div className="bg-slate-800/20 rounded-xl border-2 border-slate-700/30">
+            <div className="flex items-center gap-3 p-4">
+              <span
+                className={`
+                  flex-1 px-4 py-2 rounded-lg font-semibold transition-all duration-200
+                  ${workflowState.stage === 'test_campaign'
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                    : 'bg-slate-800/40 text-blue-300/60'
+                  }
+                `}
+              >
+                🧪 Test
+              </span>
+            </div>
+          </div>
+
+          {/* Stage 9: Production Campaign (no separate content) */}
+          <div className="bg-slate-800/20 rounded-xl border-2 border-slate-700/30">
+            <div className="flex items-center gap-3 p-4">
+              <span
+                className={`
+                  flex-1 px-4 py-2 rounded-lg font-semibold transition-all duration-200
+                  ${workflowState.stage === 'production_campaign'
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                    : 'bg-slate-800/40 text-blue-300/60'
+                  }
+                `}
+              >
+                🚀 Publish
+              </span>
+            </div>
+          </div>
 
           {/* Stage 10: Analytics */}
-          {workflowState.stage === 'analytics' && workflowState.metrics && (
-            <>
-              <CampaignAnalytics
-                metrics={workflowState.metrics}
-                onRefresh={handleRefreshAnalytics}
-                isLoading={isProcessing}
-              />
-              <div className="flex justify-between mt-6">
-                <button
-                  onClick={handleResetWorkflow}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/30 flex items-center gap-2"
-                >
-                  <span>🔄</span>
-                  Start New Campaign
-                </button>
+          <div className="bg-slate-800/20 rounded-xl border-2 border-slate-700/30">
+            <div className="flex items-center gap-3 p-4">
+              <span
+                className={`
+                  flex-1 px-4 py-2 rounded-lg font-semibold transition-all duration-200
+                  ${workflowState.stage === 'analytics'
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                    : 'bg-slate-800/40 text-blue-300/60'
+                  }
+                `}
+              >
+                📈 Analytics
+              </span>
+            </div>
+            {workflowState.stage === 'analytics' && workflowState.metrics && (
+              <div className="p-4 pt-0">
+                <CampaignAnalytics
+                  metrics={workflowState.metrics}
+                  onRefresh={handleRefreshAnalytics}
+                  isLoading={isProcessing}
+                />
+                <div className="flex justify-between mt-4">
+                  <button
+                    onClick={handleResetWorkflow}
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/30 flex items-center gap-2"
+                  >
+                    <span>🔄</span>
+                    Start New Campaign
+                  </button>
+                </div>
               </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
