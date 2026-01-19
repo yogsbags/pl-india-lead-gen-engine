@@ -177,9 +177,10 @@ export async function POST(request: NextRequest) {
     // Parse query to extract structured search parameters
     const searchParams = parseSearchQuery(query)
 
-    // Call NEW Apollo People Search API (returns shallow profiles - FREE)
+    // Call Apollo People Search API (returns shallow profiles - FREE)
+    // CORRECT endpoint: /mixed_people/api_search (all lowercase)
     const response = await axios.post<ApolloSearchResponse>(
-      'https://api.apollo.io/v1/Mixed_people/api_search',
+      'https://api.apollo.io/v1/mixed_people/api_search',
       {
         ...searchParams,
         page: 1,
