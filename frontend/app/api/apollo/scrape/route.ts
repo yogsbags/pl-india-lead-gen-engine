@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
 
     // Call Apollo People Search API
     const response = await axios.post<ApolloSearchResponse>(
-      'https://api.apollo.io/v1/mixed_people/search',
+      'https://api.apollo.io/api/v1/mixed_people/search',
       {
         ...searchCriteria,
         page: 1,
@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
       {
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
           'X-Api-Key': apolloApiKey
         }
       }
@@ -116,13 +117,25 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error('Apollo scraping error:', error.response?.data || error.message)
+    console.error('Apollo scraping error:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    })
+
+    const errorMessage = error.response?.data?.error
+      || error.response?.data?.message
+      || error.message
+      || 'Failed to scrape leads'
+
     return NextResponse.json(
       {
         success: false,
-        error: error.response?.data?.message || error.message || 'Failed to scrape leads'
+        error: errorMessage,
+        details: error.response?.data
       },
-      { status: 500 }
+      { status: error.response?.status || 500 }
     )
   }
 }
