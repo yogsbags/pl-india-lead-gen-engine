@@ -126,15 +126,13 @@ export async function POST(request: NextRequest) {
         // Use Apollo person ID if available (from shallow profile search), otherwise match by identifiers
         const bulkRequestBody = {
           details: leads.map(lead => {
-            // If lead has Apollo ID, use it for direct lookup (most reliable)
+            // If lead has Apollo person ID, use it for direct lookup (most reliable)
             if (lead.id) {
               return {
-                id: lead.id,  // Use Apollo person ID if available
-                reveal_personal_emails: true,
-                reveal_phone_number: true
+                id: lead.id  // Use Apollo person ID if available - reveal flags are at top level
               }
             }
-            // Otherwise, match by identifiers
+            // Otherwise, match by identifiers (name, company, LinkedIn, etc.)
             return {
               first_name: lead.first_name,
               last_name: lead.last_name,
