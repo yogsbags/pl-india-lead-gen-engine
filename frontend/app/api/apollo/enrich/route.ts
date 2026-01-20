@@ -38,6 +38,9 @@ interface ApolloEnrichedPerson {
   linkedin_url?: string
   twitter_url?: string
   facebook_url?: string
+  city?: string
+  state?: string
+  country?: string
   organization?: {
     id?: string
     name?: string
