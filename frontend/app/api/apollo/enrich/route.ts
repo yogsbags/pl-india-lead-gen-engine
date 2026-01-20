@@ -181,11 +181,13 @@ export async function POST(request: NextRequest) {
         const matches = response.data.matches || []
 
         // Process bulk results
+        // Note: Apollo may return null values in matches array if no match found
         for (let i = 0; i < leads.length; i++) {
           const lead = leads[i]
           const person = matches[i]
 
-          if (!person) {
+          // Skip null matches (Apollo couldn't match this lead)
+          if (!person || person === null) {
             console.warn(`No match found for lead ${i + 1}:`, {
               id: lead.id,
               name: `${lead.first_name} ${lead.last_name}`,
