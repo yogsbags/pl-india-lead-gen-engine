@@ -6,10 +6,31 @@ interface EnrichmentRequest {
     id: string
     first_name: string
     last_name: string
+    name?: string
+    email?: string
+    phone?: string
+    mobile_phone?: string
+    corporate_phone?: string
+    email_confidence_score?: number
+    email_status?: string
+    title?: string
+    headline?: string
+    city?: string
+    state?: string
+    country?: string
+    seniority?: string
+    departments?: string[]
     organization?: {
       name?: string
       website_url?: string
       primary_domain?: string
+      industry?: string
+      num_employees?: number
+      estimated_num_employees?: number
+      annual_revenue?: number
+      city?: string
+      state?: string
+      country?: string
     }
     linkedin_url?: string
   }>
