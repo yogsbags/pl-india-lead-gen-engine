@@ -230,9 +230,9 @@ export async function POST(request: NextRequest) {
               name: person.name,
               hasEmail: !!person.email,
               emailConfidence: person.email_confidence_score,
-              reason: !person.email ? 'no email' : person.email_confidence_score <= 80 ? 'low confidence' : 'unknown'
+              reason: !person.email ? 'no email' : (person.email_confidence_score && person.email_confidence_score <= 80) ? 'low confidence' : 'unknown'
             })
-            failedLeads.push(`${person.first_name || lead.first_name} ${person.last_name || lead.last_name} (${!person.email ? 'no email' : `email confidence: ${person.email_confidence_score}%`})`)
+            failedLeads.push(`${person.first_name || lead.first_name} ${person.last_name || lead.last_name} (${!person.email ? 'no email' : `email confidence: ${person.email_confidence_score || 0}%`})`)
           }
         }
 
