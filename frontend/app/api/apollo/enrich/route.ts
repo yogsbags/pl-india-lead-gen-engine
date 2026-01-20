@@ -9,6 +9,7 @@ interface EnrichmentRequest {
     organization?: {
       name?: string
       website_url?: string
+      primary_domain?: string
     }
     linkedin_url?: string
   }>
@@ -137,7 +138,7 @@ export async function POST(request: NextRequest) {
               first_name: lead.first_name,
               last_name: lead.last_name,
               organization_name: lead.organization?.name,
-              domain: lead.organization?.website_url || lead.organization?.primary_domain,
+              domain: lead.organization?.website_url || lead.organization?.primary_domain || undefined,
               linkedin_url: lead.linkedin_url
             }
           }),
