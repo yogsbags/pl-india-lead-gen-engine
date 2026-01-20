@@ -120,8 +120,69 @@ export async function POST(request: NextRequest) {
     const failedLeads: string[] = []
     let totalConfidence = 0
 
+    // Check if leads already have emails from shallow search
+    // If they do, use them directly without enrichment (saves API credits)
+    const leadsWithEmails = leads.filter(lead => lead.email && lead.email_confidence_score && lead.email_confidence_score > 80)
+    const leadsNeedingEnrichment = leads.filter(lead => !lead.email || !lead.email_confidence_score || lead.email_confidence_score <= 80)
+
+    console.log('Enrichment analysis:', {
+      totalLeads: leads.length,
+      alreadyHaveEmails: leadsWithEmails.length,
+      needEnrichment: leadsNeedingEnrichment.length
+    })
+
+    // Use existing emails directly (no API call needed)
+    for (const lead of leadsWithEmails) {
+      enrichedLeads.push({
+        id: lead.id,
+        name: lead.name || `${lead.first_name} ${lead.last_name}`,
+        first_name: lead.first_name,
+        last_name: lead.last_name,
+        email: lead.email,
+        email_confidence: lead.email_confidence_score || 95,
+        phone: lead.phone || lead.mobile_phone || lead.corporate_phone,
+        mobile_phone: lead.mobile_phone,
+        corporate_phone: lead.corporate_phone,
+        title: lead.title,
+        headline: lead.headline,
+        linkedin_url: lead.linkedin_url,
+        company: lead.organization?.name,
+        company_website: lead.organization?.website_url,
+        industry: lead.organization?.industry,
+        employee_count: lead.organization?.num_employees || lead.organization?.estimated_num_employees,
+        annual_revenue: lead.organization?.annual_revenue,
+        city: lead.city || lead.organization?.city,
+        state: lead.state || lead.organization?.state,
+        country: lead.country || lead.organization?.country,
+        seniority: lead.seniority,
+        departments: lead.departments
+      })
+      totalConfidence += lead.email_confidence_score || 95
+    }
+
+    // Only enrich leads that don't have emails or have low confidence
+    if (leadsNeedingEnrichment.length === 0) {
+      console.log('All leads already have emails, skipping enrichment API call')
+      const avgConfidence = enrichedLeads.length > 0 ? totalConfidence / enrichedLeads.length : 0
+      return NextResponse.json({
+        success: true,
+        leads: enrichedLeads,
+        stats: {
+          total: leads.length,
+          enriched: enrichedLeads.length,
+          with_email: enrichedLeads.length,
+          with_phone: enrichedLeads.filter(l => l.phone).length,
+          avg_confidence: Math.round(avgConfidence * 10) / 10,
+          failed: failedLeads.length,
+          bulk_api_used: false,
+          used_existing_emails: true
+        },
+        failedLeads: failedLeads.length > 0 ? failedLeads : undefined
+      })
+    }
+
     // Use bulk endpoint for multiple leads, single endpoint for one lead
-    const useBulkApi = leads.length > 1
+    const useBulkApi = leadsNeedingEnrichment.length > 1
 
     if (useBulkApi) {
       // **BULK ENRICHMENT** - Process all leads in single API call
@@ -129,7 +190,7 @@ export async function POST(request: NextRequest) {
         // Prepare bulk match request
         // Use Apollo person ID if available (from shallow profile search), otherwise match by identifiers
         const bulkRequestBody = {
-          details: leads.map(lead => {
+          details: leadsNeedingEnrichment.map(lead => {
             // If lead has Apollo person ID, use it for direct lookup (most reliable)
             if (lead.id) {
               return {
@@ -151,7 +212,8 @@ export async function POST(request: NextRequest) {
         }
 
         console.log('Bulk enrichment request:', JSON.stringify({
-          leadsCount: leads.length,
+          totalLeads: leads.length,
+          leadsNeedingEnrichment: leadsNeedingEnrichment.length,
           detailsCount: bulkRequestBody.details.length,
           usingIds: bulkRequestBody.details.filter((d: any) => d.id).length
         }, null, 2))
@@ -182,8 +244,8 @@ export async function POST(request: NextRequest) {
 
         // Process bulk results
         // Note: Apollo may return null values in matches array if no match found
-        for (let i = 0; i < leads.length; i++) {
-          const lead = leads[i]
+        for (let i = 0; i < leadsNeedingEnrichment.length; i++) {
+          const lead = leadsNeedingEnrichment[i]
           const person = matches[i]
 
           // Skip null matches (Apollo couldn't match this lead)
@@ -250,12 +312,16 @@ export async function POST(request: NextRequest) {
 
         // Fallback to sequential enrichment if bulk API fails
         console.warn('Bulk API failed, falling back to sequential enrichment...')
-        return await fallbackToSequentialEnrichment(leads, apolloApiKey)
+        const fallbackResults = await fallbackToSequentialEnrichment(leadsNeedingEnrichment, apolloApiKey)
+        // Merge fallback results with existing enriched leads
+        enrichedLeads.push(...fallbackResults.leads)
+        failedLeads.push(...(fallbackResults.failedLeads || []))
+        totalConfidence += fallbackResults.totalConfidence || 0
       }
 
     } else {
       // **SINGLE LEAD ENRICHMENT** - Use original single-person endpoint
-      const lead = leads[0]
+      const lead = leadsNeedingEnrichment[0]
 
       try {
         const response = await axios.post<{ person: ApolloEnrichedPerson }>(
@@ -329,7 +395,8 @@ export async function POST(request: NextRequest) {
         with_phone: enrichedLeads.filter(l => l.phone).length,
         avg_confidence: Math.round(avgConfidence * 10) / 10,
         failed: failedLeads.length,
-        bulk_api_used: useBulkApi
+        bulk_api_used: useBulkApi,
+        used_existing_emails: leadsWithEmails.length > 0
       },
       failedLeads: failedLeads.length > 0 ? failedLeads : undefined
     })
@@ -349,7 +416,7 @@ export async function POST(request: NextRequest) {
 /**
  * Fallback to sequential enrichment if bulk API fails
  */
-async function fallbackToSequentialEnrichment(leads: any[], apolloApiKey: string) {
+async function fallbackToSequentialEnrichment(leads: any[], apolloApiKey: string): Promise<{ leads: EnrichedLead[], failedLeads: string[], totalConfidence: number }> {
   const enrichedLeads: EnrichedLead[] = []
   const failedLeads: string[] = []
   let totalConfidence = 0
@@ -419,22 +486,10 @@ async function fallbackToSequentialEnrichment(leads: any[], apolloApiKey: string
     }
   }
 
-  const avgConfidence = enrichedLeads.length > 0 ? totalConfidence / enrichedLeads.length : 0
-
-  return NextResponse.json({
-    success: true,
+  return {
     leads: enrichedLeads,
-    stats: {
-      total: leads.length,
-      enriched: enrichedLeads.length,
-      with_email: enrichedLeads.length,
-      with_phone: enrichedLeads.filter(l => l.phone).length,
-      avg_confidence: Math.round(avgConfidence * 10) / 10,
-      failed: failedLeads.length,
-      bulk_api_used: false,
-      fallback_used: true
-    },
-    failedLeads: failedLeads.length > 0 ? failedLeads : undefined
-  })
+    failedLeads,
+    totalConfidence
+  }
 }
 

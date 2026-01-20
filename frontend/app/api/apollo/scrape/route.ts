@@ -39,6 +39,10 @@ interface ApolloPerson {
   organization?: ApolloOrganization
   headline?: string
   photo_url?: string
+  email?: string
+  phone?: string
+  email_status?: string
+  email_confidence_score?: number
 }
 
 interface ApolloSearchResponse {
