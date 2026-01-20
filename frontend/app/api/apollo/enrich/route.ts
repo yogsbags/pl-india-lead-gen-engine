@@ -230,16 +230,18 @@ export async function POST(request: NextRequest) {
           })
 
           // Only include leads with email and confidence > 80%
-          if (person.email && person.email_confidence_score && person.email_confidence_score > 80) {
-            totalConfidence += person.email_confidence_score
+          const personEmail = person.email
+          const personEmailConfidence = person.email_confidence_score
+          if (personEmail && personEmailConfidence && personEmailConfidence > 80) {
+            totalConfidence += personEmailConfidence
 
             enrichedLeads.push({
               id: person.id,
               name: person.name,
               first_name: person.first_name,
               last_name: person.last_name,
-              email: person.email,
-              email_confidence: person.email_confidence_score,
+              email: personEmail,
+              email_confidence: personEmailConfidence,
               phone: person.phone_numbers?.[0]?.sanitized_number || person.mobile_phone || person.corporate_phone,
               mobile_phone: person.mobile_phone,
               corporate_phone: person.corporate_phone,
@@ -307,16 +309,18 @@ export async function POST(request: NextRequest) {
         const person = response.data.person
 
         // Only include leads with email and confidence > 80%
-        if (person.email && person.email_confidence_score && person.email_confidence_score > 80) {
-          totalConfidence += person.email_confidence_score
+        const personEmail = person.email
+        const personEmailConfidence = person.email_confidence_score
+        if (personEmail && personEmailConfidence && personEmailConfidence > 80) {
+          totalConfidence += personEmailConfidence
 
           enrichedLeads.push({
             id: person.id,
             name: person.name,
             first_name: person.first_name,
             last_name: person.last_name,
-            email: person.email,
-            email_confidence: person.email_confidence_score,
+            email: personEmail,
+            email_confidence: personEmailConfidence,
             phone: person.phone_numbers?.[0]?.sanitized_number,
             mobile_phone: person.mobile_phone,
             corporate_phone: person.corporate_phone,
