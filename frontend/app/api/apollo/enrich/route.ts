@@ -145,8 +145,9 @@ export async function POST(request: NextRequest) {
               linkedin_url: lead.linkedin_url
             }
           }),
-          reveal_personal_emails: true,
-          reveal_phone_number: true
+          reveal_personal_emails: true
+          // Note: reveal_phone_number requires webhook_url, so we skip it
+          // Phone numbers may still be included if available in Apollo's response
         }
 
         console.log('Bulk enrichment request:', JSON.stringify({
@@ -155,16 +156,22 @@ export async function POST(request: NextRequest) {
           usingIds: bulkRequestBody.details.filter((d: any) => d.id).length
         }, null, 2))
 
-        const response = await axios.post<{ matches: ApolloEnrichedPerson[] }>(
+        const response = await axios.post<{ matches: ApolloEnrichedPerson[]; error?: string }>(
           'https://api.apollo.io/v1/people/bulk_match',
           bulkRequestBody,
           {
             headers: {
               'Content-Type': 'application/json',
               'X-Api-Key': apolloApiKey
-            }
+            },
+            validateStatus: () => true // Don't throw on HTTP errors
           }
         )
+
+        // Check for API errors in response
+        if (response.status !== 200 || response.data.error) {
+          throw new Error(response.data.error || `Apollo API returned ${response.status}`)
+        }
 
         console.log('Bulk enrichment response:', JSON.stringify({
           matchesCount: response.data.matches?.length || 0,
@@ -257,8 +264,8 @@ export async function POST(request: NextRequest) {
             organization_name: lead.organization?.name,
             domain: lead.organization?.website_url,
             linkedin_url: lead.linkedin_url,
-            reveal_personal_emails: true,
-            reveal_phone_number: true
+            reveal_personal_emails: true
+            // Note: reveal_phone_number requires webhook_url, skipping for now
           },
           {
             headers: {
@@ -356,8 +363,9 @@ async function fallbackToSequentialEnrichment(leads: any[], apolloApiKey: string
           organization_name: lead.organization?.name,
           domain: lead.organization?.website_url,
           linkedin_url: lead.linkedin_url,
-          reveal_personal_emails: true,
-          reveal_phone_number: true
+          reveal_personal_emails: true
+          // Note: reveal_phone_number requires webhook_url, so we skip it
+          // Phone numbers may still be included if available in Apollo's response
         },
         {
           headers: {
