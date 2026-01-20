@@ -123,17 +123,35 @@ export async function POST(request: NextRequest) {
       // **BULK ENRICHMENT** - Process all leads in single API call
       try {
         // Prepare bulk match request
+        // Use Apollo person ID if available (from shallow profile search), otherwise match by identifiers
         const bulkRequestBody = {
-          details: leads.map(lead => ({
-            first_name: lead.first_name,
-            last_name: lead.last_name,
-            organization_name: lead.organization?.name,
-            domain: lead.organization?.website_url,
-            linkedin_url: lead.linkedin_url
-          })),
+          details: leads.map(lead => {
+            // If lead has Apollo ID, use it for direct lookup (most reliable)
+            if (lead.id) {
+              return {
+                id: lead.id,  // Use Apollo person ID if available
+                reveal_personal_emails: true,
+                reveal_phone_number: true
+              }
+            }
+            // Otherwise, match by identifiers
+            return {
+              first_name: lead.first_name,
+              last_name: lead.last_name,
+              organization_name: lead.organization?.name,
+              domain: lead.organization?.website_url || lead.organization?.primary_domain,
+              linkedin_url: lead.linkedin_url
+            }
+          }),
           reveal_personal_emails: true,
           reveal_phone_number: true
         }
+
+        console.log('Bulk enrichment request:', JSON.stringify({
+          leadsCount: leads.length,
+          detailsCount: bulkRequestBody.details.length,
+          usingIds: bulkRequestBody.details.filter((d: any) => d.id).length
+        }, null, 2))
 
         const response = await axios.post<{ matches: ApolloEnrichedPerson[] }>(
           'https://api.apollo.io/v1/people/bulk_match',
@@ -146,6 +164,11 @@ export async function POST(request: NextRequest) {
           }
         )
 
+        console.log('Bulk enrichment response:', JSON.stringify({
+          matchesCount: response.data.matches?.length || 0,
+          matches: response.data.matches?.slice(0, 2) // Log first 2 for debugging
+        }, null, 2))
+
         const matches = response.data.matches || []
 
         // Process bulk results
@@ -154,9 +177,23 @@ export async function POST(request: NextRequest) {
           const person = matches[i]
 
           if (!person) {
-            failedLeads.push(`${lead.first_name} ${lead.last_name} (no match found)`)
+            console.warn(`No match found for lead ${i + 1}:`, {
+              id: lead.id,
+              name: `${lead.first_name} ${lead.last_name}`,
+              company: lead.organization?.name,
+              linkedin: lead.linkedin_url
+            })
+            failedLeads.push(`${lead.first_name || 'Unknown'} ${lead.last_name || ''} (no match found)`)
             continue
           }
+
+          console.log(`Processing match ${i + 1}:`, {
+            id: person.id,
+            name: person.name,
+            hasEmail: !!person.email,
+            emailConfidence: person.email_confidence_score,
+            hasPhone: !!(person.phone_numbers?.length || person.mobile_phone || person.corporate_phone)
+          })
 
           // Only include leads with email and confidence > 80%
           if (person.email && person.email_confidence_score && person.email_confidence_score > 80) {
@@ -169,7 +206,7 @@ export async function POST(request: NextRequest) {
               last_name: person.last_name,
               email: person.email,
               email_confidence: person.email_confidence_score,
-              phone: person.phone_numbers?.[0]?.sanitized_number,
+              phone: person.phone_numbers?.[0]?.sanitized_number || person.mobile_phone || person.corporate_phone,
               mobile_phone: person.mobile_phone,
               corporate_phone: person.corporate_phone,
               title: person.title,
@@ -180,14 +217,20 @@ export async function POST(request: NextRequest) {
               industry: person.organization?.industry,
               employee_count: person.organization?.estimated_num_employees,
               annual_revenue: person.organization?.annual_revenue,
-              city: person.organization?.city,
-              state: person.organization?.state,
-              country: person.organization?.country,
+              city: person.city || person.organization?.city,
+              state: person.state || person.organization?.state,
+              country: person.country || person.organization?.country,
               seniority: person.seniority,
               departments: person.departments
             })
           } else {
-            failedLeads.push(`${lead.first_name} ${lead.last_name} (low email confidence or no email)`)
+            console.warn(`Lead ${i + 1} filtered out:`, {
+              name: person.name,
+              hasEmail: !!person.email,
+              emailConfidence: person.email_confidence_score,
+              reason: !person.email ? 'no email' : person.email_confidence_score <= 80 ? 'low confidence' : 'unknown'
+            })
+            failedLeads.push(`${person.first_name || lead.first_name} ${person.last_name || lead.last_name} (${!person.email ? 'no email' : `email confidence: ${person.email_confidence_score}%`})`)
           }
         }
 
