@@ -154,10 +154,10 @@ export async function POST(request: NextRequest) {
         const bulkRequestBody = {
           details: leads.map(lead => {
             // If lead has Apollo person ID, use it for direct lookup (most reliable)
-            // According to Apollo API docs: use person_id field for ID-based matching
+            // Apollo API expects "id" field (not "person_id") for ID-based matching
             if (lead.id) {
               return {
-                person_id: lead.id  // Use person_id field (per Apollo API docs)
+                id: lead.id  // Use "id" field (as shown in Apollo's working example)
               }
             }
             // Otherwise, match by identifiers (name, company, LinkedIn, etc.)
@@ -181,21 +181,24 @@ export async function POST(request: NextRequest) {
             }
 
             return detail
-          }),
-          reveal_personal_emails: true
+          })
+          // Note: reveal_personal_emails goes in URL query param, not body
           // Note: reveal_phone_number requires webhook_url, so we skip it
-          // Phone numbers may still be included if available in Apollo's response
         }
 
         console.log('Bulk enrichment request:', JSON.stringify({
           totalLeads: leads.length,
           detailsCount: bulkRequestBody.details.length,
-          usingPersonIds: bulkRequestBody.details.filter((d: any) => d.person_id).length,
-          usingIdentifiers: bulkRequestBody.details.filter((d: any) => !d.person_id).length
+          usingPersonIds: bulkRequestBody.details.filter((d: any) => d.id).length,
+          usingIdentifiers: bulkRequestBody.details.filter((d: any) => !d.id).length
         }, null, 2))
 
+        // Log the FULL Apollo request for debugging
+        console.log('Full Apollo bulk_match request body:', JSON.stringify(bulkRequestBody, null, 2))
+
+        // Use query parameters for reveal_personal_emails (as per Apollo API docs)
         const response = await axios.post<{ matches: ApolloEnrichedPerson[]; error?: string }>(
-          'https://api.apollo.io/v1/people/bulk_match',
+          'https://api.apollo.io/api/v1/people/bulk_match?reveal_personal_emails=true&reveal_phone_number=false',
           bulkRequestBody,
           {
             headers: {
@@ -220,16 +223,16 @@ export async function POST(request: NextRequest) {
 
         // Process bulk results
         // Note: Apollo may return null values in matches array if no match found
-        // If person_id matching fails, we'll need to try identifier-based matching
+        // If id-based matching fails, we'll need to try identifier-based matching
         const leadsNeedingFallback: typeof leads = []
 
         for (let i = 0; i < leads.length; i++) {
           const lead = leads[i]
           const person = matches[i]
 
-          // Skip null matches (Apollo couldn't match this lead using person_id)
+          // Skip null matches (Apollo couldn't match this lead using id)
           if (!person || person === null) {
-            console.warn(`No match found for lead ${i + 1} using person_id:`, {
+            console.warn(`No match found for lead ${i + 1} using id:`, {
               id: lead.id,
               name: `${lead.first_name} ${lead.last_name}`,
               company: lead.organization?.name,
@@ -290,7 +293,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // **FALLBACK**: If person_id matching failed for some leads, try identifier-based matching
+        // **FALLBACK**: If id-based matching failed for some leads, try identifier-based matching
         if (leadsNeedingFallback.length > 0) {
           console.log(`Attempting fallback enrichment for ${leadsNeedingFallback.length} leads using identifiers...`)
 
@@ -315,12 +318,11 @@ export async function POST(request: NextRequest) {
                 }
 
                 return detail
-              }).filter((d: any) => d.first_name && (d.last_name || d.organization_name)), // Only include valid
-              reveal_personal_emails: true
+              }).filter((d: any) => d.first_name && (d.last_name || d.organization_name)) // Only include valid
             }
 
             const fallbackResponse = await axios.post<{ matches: ApolloEnrichedPerson[]; error?: string }>(
-              'https://api.apollo.io/v1/people/bulk_match',
+              'https://api.apollo.io/api/v1/people/bulk_match?reveal_personal_emails=true&reveal_phone_number=false',
               fallbackRequestBody,
               {
                 headers: {
@@ -404,7 +406,7 @@ export async function POST(request: NextRequest) {
 
       try {
         const response = await axios.post<{ person: ApolloEnrichedPerson }>(
-          'https://api.apollo.io/v1/people/match',
+          'https://api.apollo.io/api/v1/people/match',
           {
             first_name: lead.first_name,
             last_name: lead.last_name,
@@ -505,7 +507,7 @@ async function fallbackToSequentialEnrichment(leads: any[], apolloApiKey: string
   for (const lead of leads) {
     try {
       const response = await axios.post<{ person: ApolloEnrichedPerson }>(
-        'https://api.apollo.io/v1/people/match',
+        'https://api.apollo.io/api/v1/people/match',
         {
           first_name: lead.first_name,
           last_name: lead.last_name,
