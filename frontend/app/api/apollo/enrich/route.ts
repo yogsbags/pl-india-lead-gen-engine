@@ -154,19 +154,33 @@ export async function POST(request: NextRequest) {
         const bulkRequestBody = {
           details: leads.map(lead => {
             // If lead has Apollo person ID, use it for direct lookup (most reliable)
+            // According to Apollo API docs: use person_id field for ID-based matching
             if (lead.id) {
               return {
-                id: lead.id  // Use Apollo person ID if available - reveal flags are at top level
+                person_id: lead.id  // Use person_id field (per Apollo API docs)
               }
             }
             // Otherwise, match by identifiers (name, company, LinkedIn, etc.)
-            return {
+            const detail: any = {
               first_name: lead.first_name,
-              last_name: lead.last_name,
-              organization_name: lead.organization?.name,
-              domain: lead.organization?.website_url || lead.organization?.primary_domain || undefined,
-              linkedin_url: lead.linkedin_url
+              last_name: lead.last_name
             }
+
+            // Add optional identifiers for better matching
+            if (lead.organization?.name) {
+              detail.organization_name = lead.organization.name
+            }
+            if (lead.organization?.primary_domain) {
+              detail.domain = lead.organization.primary_domain
+            } else if (lead.organization?.website_url) {
+              // Extract domain from website URL
+              detail.domain = lead.organization.website_url.replace(/^https?:\/\//, '').split('/')[0]
+            }
+            if (lead.linkedin_url) {
+              detail.linkedin_url = lead.linkedin_url
+            }
+
+            return detail
           }),
           reveal_personal_emails: true
           // Note: reveal_phone_number requires webhook_url, so we skip it
@@ -176,7 +190,8 @@ export async function POST(request: NextRequest) {
         console.log('Bulk enrichment request:', JSON.stringify({
           totalLeads: leads.length,
           detailsCount: bulkRequestBody.details.length,
-          usingIds: bulkRequestBody.details.filter((d: any) => d.id).length
+          usingPersonIds: bulkRequestBody.details.filter((d: any) => d.person_id).length,
+          usingIdentifiers: bulkRequestBody.details.filter((d: any) => !d.person_id).length
         }, null, 2))
 
         const response = await axios.post<{ matches: ApolloEnrichedPerson[]; error?: string }>(
@@ -205,19 +220,24 @@ export async function POST(request: NextRequest) {
 
         // Process bulk results
         // Note: Apollo may return null values in matches array if no match found
+        // If person_id matching fails, we'll need to try identifier-based matching
+        const leadsNeedingFallback: typeof leads = []
+
         for (let i = 0; i < leads.length; i++) {
           const lead = leads[i]
           const person = matches[i]
 
-          // Skip null matches (Apollo couldn't match this lead)
+          // Skip null matches (Apollo couldn't match this lead using person_id)
           if (!person || person === null) {
-            console.warn(`No match found for lead ${i + 1}:`, {
+            console.warn(`No match found for lead ${i + 1} using person_id:`, {
               id: lead.id,
               name: `${lead.first_name} ${lead.last_name}`,
               company: lead.organization?.name,
               linkedin: lead.linkedin_url
             })
-            failedLeads.push(`${lead.first_name || 'Unknown'} ${lead.last_name || ''} (no match found)`)
+
+            // Store for fallback matching with identifiers
+            leadsNeedingFallback.push(lead)
             continue
           }
 
@@ -267,6 +287,102 @@ export async function POST(request: NextRequest) {
               reason: !person.email ? 'no email' : (person.email_confidence_score && person.email_confidence_score <= 80) ? 'low confidence' : 'unknown'
             })
             failedLeads.push(`${person.first_name || lead.first_name} ${person.last_name || lead.last_name} (${!person.email ? 'no email' : `email confidence: ${person.email_confidence_score || 0}%`})`)
+          }
+        }
+
+        // **FALLBACK**: If person_id matching failed for some leads, try identifier-based matching
+        if (leadsNeedingFallback.length > 0) {
+          console.log(`Attempting fallback enrichment for ${leadsNeedingFallback.length} leads using identifiers...`)
+
+          try {
+            const fallbackRequestBody = {
+              details: leadsNeedingFallback.map(lead => {
+                const detail: any = {
+                  first_name: lead.first_name,
+                  last_name: lead.last_name_obfuscated ? undefined : lead.last_name  // Skip obfuscated names
+                }
+
+                if (lead.organization?.name) {
+                  detail.organization_name = lead.organization.name
+                }
+                if (lead.organization?.primary_domain) {
+                  detail.domain = lead.organization.primary_domain
+                } else if (lead.organization?.website_url) {
+                  detail.domain = lead.organization.website_url.replace(/^https?:\/\//, '').split('/')[0]
+                }
+                if (lead.linkedin_url) {
+                  detail.linkedin_url = lead.linkedin_url
+                }
+
+                return detail
+              }).filter((d: any) => d.first_name && (d.last_name || d.organization_name)), // Only include valid
+              reveal_personal_emails: true
+            }
+
+            const fallbackResponse = await axios.post<{ matches: ApolloEnrichedPerson[]; error?: string }>(
+              'https://api.apollo.io/v1/people/bulk_match',
+              fallbackRequestBody,
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Api-Key': apolloApiKey
+                },
+                validateStatus: () => true
+              }
+            )
+
+            if (fallbackResponse.status === 200 && !fallbackResponse.data.error && fallbackResponse.data.matches) {
+              const fallbackMatches = fallbackResponse.data.matches || []
+
+              // Process fallback results
+              for (let i = 0; i < leadsNeedingFallback.length; i++) {
+                const lead = leadsNeedingFallback[i]
+                const person = fallbackMatches[i]
+
+                if (person && person !== null) {
+                  const personEmail = person.email
+                  const personEmailConfidence = person.email_confidence_score
+                  if (personEmail && personEmailConfidence && personEmailConfidence > 80) {
+                    totalConfidence += personEmailConfidence
+
+                    enrichedLeads.push({
+                      id: person.id,
+                      name: person.name,
+                      first_name: person.first_name,
+                      last_name: person.last_name,
+                      email: personEmail,
+                      email_confidence: personEmailConfidence,
+                      phone: person.phone_numbers?.[0]?.sanitized_number || person.mobile_phone || person.corporate_phone,
+                      mobile_phone: person.mobile_phone,
+                      corporate_phone: person.corporate_phone,
+                      title: person.title,
+                      headline: person.headline,
+                      linkedin_url: person.linkedin_url,
+                      company: person.organization?.name,
+                      company_website: person.organization?.website_url,
+                      industry: person.organization?.industry,
+                      employee_count: person.organization?.estimated_num_employees,
+                      annual_revenue: person.organization?.annual_revenue,
+                      city: person.city || person.organization?.city,
+                      state: person.state || person.organization?.state,
+                      country: person.country || person.organization?.country,
+                      seniority: person.seniority,
+                      departments: person.departments
+                    })
+                    continue
+                  }
+                }
+
+                // Still no match after fallback
+                failedLeads.push(`${lead.first_name || 'Unknown'} ${lead.last_name || ''} (no match found with identifiers)`)
+              }
+            }
+          } catch (fallbackError: any) {
+            console.error('Fallback enrichment error:', fallbackError.response?.data || fallbackError.message)
+            // Mark all fallback leads as failed
+            leadsNeedingFallback.forEach(lead => {
+              failedLeads.push(`${lead.first_name || 'Unknown'} ${lead.last_name || ''} (fallback enrichment failed)`)
+            })
           }
         }
 
