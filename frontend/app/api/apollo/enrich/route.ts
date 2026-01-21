@@ -5,7 +5,8 @@ interface EnrichmentRequest {
   leads: Array<{
     id: string
     first_name: string
-    last_name: string
+    last_name?: string
+    last_name_obfuscated?: string
     name?: string
     email?: string
     phone?: string
